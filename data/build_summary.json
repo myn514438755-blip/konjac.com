@@ -1,0 +1,1214 @@
+{
+  "total_genes": 44332,
+  "gff_mrna": 44332,
+  "cds_fasta_records": 44332,
+  "pep_fasta_records": 44332,
+  "annotation_rows": 44353,
+  "annotation_unique": 44332,
+  "go_annotated_genes": 17832,
+  "goslim_annotated_genes": 17829,
+  "interpro_annotated_genes": 23936,
+  "pfam_annotated_genes": 22375,
+  "kegg_annotated_genes": 4227,
+  "plantTFDB_genes": 627,
+  "chromosomes_or_contigs": 2328,
+  "HIC_ASM_records": 35673,
+  "CTG_records": 8659,
+  "version": "v1.2.1",
+  "website_last_updated": "2026-04-29",
+  "downloads": [
+    {
+      "path": "downloads/Amorphophallus_konjac.clean.gff",
+      "name": "Amorphophallus_konjac.clean.gff",
+      "bytes": 17928143
+    },
+    {
+      "path": "downloads/Amorphophallus_konjac.clean.cds",
+      "name": "Amorphophallus_konjac.clean.cds",
+      "bytes": 49918089
+    },
+    {
+      "path": "downloads/Amorphophallus_konjac.clean.pep",
+      "name": "Amorphophallus_konjac.clean.pep",
+      "bytes": 17583227
+    },
+    {
+      "path": "downloads/zen_annotation_v2.0.tsv",
+      "name": "zen_annotation_v2.0.tsv",
+      "bytes": 14299442
+    },
+    {
+      "path": "downloads/zen_go_v2.0.tsv",
+      "name": "zen_go_v2.0.tsv",
+      "bytes": 3329666
+    },
+    {
+      "path": "downloads/zen_goslim_v2.0.tsv",
+      "name": "zen_goslim_v2.0.tsv",
+      "bytes": 4044690
+    },
+    {
+      "path": "downloads/zen_interpro_v2.0.tsv",
+      "name": "zen_interpro_v2.0.tsv",
+      "bytes": 4636740
+    },
+    {
+      "path": "downloads/zen_pfam_v2.0.tsv",
+      "name": "zen_pfam_v2.0.tsv",
+      "bytes": 2107428
+    }
+  ],
+  "field_coverage": {
+    "gene_id": 44332,
+    "gene_symbol": 627,
+    "aliases": 26545,
+    "species": 44332,
+    "chromosome": 44332,
+    "start": 44332,
+    "end": 44332,
+    "strand": 44332,
+    "transcript_id": 44332,
+    "protein_id": 44332,
+    "functional_annotation": 44332,
+    "swissprot": 26470,
+    "eggnog": 26545,
+    "go_terms": 17832,
+    "go_slim_terms": 17829,
+    "kegg_terms": 4227,
+    "interpro_domains": 24018,
+    "pfam_domains": 22375,
+    "orthogroup": 26545,
+    "module": 0,
+    "expression_summary": 0,
+    "coexpression_partners": 0,
+    "source": 44332,
+    "data_status": 44332,
+    "notes": 26545,
+    "last_updated": 44332,
+    "cds_length": 44332,
+    "protein_length": 44332,
+    "cds_count": 44332,
+    "exon_count": 44332,
+    "genome_browser_locus": 44332,
+    "kusakidb_accession": 26470,
+    "ko_id": 1519,
+    "ec_number": 3065,
+    "plantTFDB_family": 627,
+    "plantTFDB_description": 627,
+    "target_species": 26525,
+    "target_family": 26525,
+    "sequence_identity": 26545,
+    "e_value": 26545,
+    "bitscore": 26545
+  },
+  "topic_counts": {
+    "kgm": 580,
+    "csl": 28,
+    "glyco": 480,
+    "tf": 3825,
+    "stress": 790,
+    "kinase": 1864,
+    "transporter": 1397,
+    "cellwall": 564
+  },
+  "top_terms": {
+    "go_terms": [
+      {
+        "term": "GO:0016021 integral component of membrane [CC]",
+        "count": 4147
+      },
+      {
+        "term": "GO:0005524 ATP binding [MF]",
+        "count": 2106
+      },
+      {
+        "term": "GO:0005634 nucleus [CC]",
+        "count": 1723
+      },
+      {
+        "term": "GO:0046872 metal ion binding [MF]",
+        "count": 1174
+      },
+      {
+        "term": "GO:0003677 DNA binding [MF]",
+        "count": 836
+      },
+      {
+        "term": "GO:0005737 cytoplasm [CC]",
+        "count": 772
+      },
+      {
+        "term": "GO:0003723 RNA binding [MF]",
+        "count": 653
+      },
+      {
+        "term": "GO:0008270 zinc ion binding [MF]",
+        "count": 567
+      },
+      {
+        "term": "GO:0004672 protein kinase activity [MF]",
+        "count": 516
+      },
+      {
+        "term": "GO:0006355 regulation of transcription, DNA-templated [BP]",
+        "count": 455
+      },
+      {
+        "term": "GO:0003735 structural constituent of ribosome [MF]",
+        "count": 435
+      },
+      {
+        "term": "GO:0003700 DNA-binding transcription factor activity [MF]",
+        "count": 425
+      },
+      {
+        "term": "GO:0006412 translation [BP]",
+        "count": 422
+      },
+      {
+        "term": "GO:0005840 ribosome [CC]",
+        "count": 383
+      },
+      {
+        "term": "GO:0016301 kinase activity [MF]",
+        "count": 372
+      },
+      {
+        "term": "GO:0005975 carbohydrate metabolic process [BP]",
+        "count": 352
+      },
+      {
+        "term": "GO:0020037 heme binding [MF]",
+        "count": 347
+      },
+      {
+        "term": "GO:0016491 oxidoreductase activity [MF]",
+        "count": 345
+      },
+      {
+        "term": "GO:0046983 protein dimerization activity [MF]",
+        "count": 339
+      },
+      {
+        "term": "GO:0005525 GTP binding [MF]",
+        "count": 339
+      },
+      {
+        "term": "GO:0004674 protein serine/threonine kinase activity [MF]",
+        "count": 337
+      },
+      {
+        "term": "GO:0016740 transferase activity [MF]",
+        "count": 320
+      },
+      {
+        "term": "GO:0016020 membrane [CC]",
+        "count": 311
+      },
+      {
+        "term": "GO:0005506 iron ion binding [MF]",
+        "count": 296
+      },
+      {
+        "term": "GO:0016787 hydrolase activity [MF]",
+        "count": 293
+      },
+      {
+        "term": "GO:0008168 methyltransferase activity [MF]",
+        "count": 282
+      },
+      {
+        "term": "GO:0005886 plasma membrane [CC]",
+        "count": 280
+      },
+      {
+        "term": "GO:0032259 methylation [BP]",
+        "count": 271
+      },
+      {
+        "term": "GO:0003676 nucleic acid binding [MF]",
+        "count": 246
+      },
+      {
+        "term": "GO:0005509 calcium ion binding [MF]",
+        "count": 241
+      }
+    ],
+    "go_slim_terms": [
+      {
+        "term": "GO:0043167 ion binding [MF]",
+        "count": 5102
+      },
+      {
+        "term": "GO:0016020 membrane [CC]",
+        "count": 4772
+      },
+      {
+        "term": "GO:0016740 transferase activity [MF]",
+        "count": 3546
+      },
+      {
+        "term": "GO:0000166 nucleotide binding [MF]",
+        "count": 2745
+      },
+      {
+        "term": "GO:0003676 nucleic acid binding [MF]",
+        "count": 2583
+      },
+      {
+        "term": "GO:0016787 hydrolase activity [MF]",
+        "count": 2070
+      },
+      {
+        "term": "GO:0005634 nucleus [CC]",
+        "count": 1963
+      },
+      {
+        "term": "GO:0006464 cellular protein modification process [BP]",
+        "count": 1905
+      },
+      {
+        "term": "GO:0006793 phosphorus metabolic process [BP]",
+        "count": 1894
+      },
+      {
+        "term": "GO:0050789 regulation of biological process [BP]",
+        "count": 1725
+      },
+      {
+        "term": "GO:0005515 protein binding [MF]",
+        "count": 1332
+      },
+      {
+        "term": "GO:0016491 oxidoreductase activity [MF]",
+        "count": 1274
+      },
+      {
+        "term": "GO:0005737 cytoplasm [CC]",
+        "count": 1190
+      },
+      {
+        "term": "GO:0006351 transcription, DNA-templated [BP]",
+        "count": 1137
+      },
+      {
+        "term": "GO:0005215 transporter activity [MF]",
+        "count": 981
+      },
+      {
+        "term": "GO:0050896 response to stimulus [BP]",
+        "count": 905
+      },
+      {
+        "term": "GO:0008233 peptidase activity [MF]",
+        "count": 638
+      },
+      {
+        "term": "GO:0065009 regulation of molecular function [BP]",
+        "count": 630
+      },
+      {
+        "term": "GO:0005975 carbohydrate metabolic process [BP]",
+        "count": 622
+      },
+      {
+        "term": "GO:0006810 transport [BP]",
+        "count": 615
+      },
+      {
+        "term": "GO:0005198 structural molecule activity [MF]",
+        "count": 522
+      },
+      {
+        "term": "GO:0015031 protein transport [BP]",
+        "count": 518
+      },
+      {
+        "term": "GO:0005840 ribosome [CC]",
+        "count": 517
+      },
+      {
+        "term": "GO:0008152 metabolic process [BP]",
+        "count": 511
+      },
+      {
+        "term": "GO:0005575 cellular_component [CC]",
+        "count": 505
+      },
+      {
+        "term": "GO:0009059 macromolecule biosynthetic process [BP]",
+        "count": 478
+      },
+      {
+        "term": "GO:0006811 ion transport [BP]",
+        "count": 471
+      },
+      {
+        "term": "GO:0032991 protein-containing complex [CC]",
+        "count": 468
+      },
+      {
+        "term": "GO:0016070 RNA metabolic process [BP]",
+        "count": 461
+      },
+      {
+        "term": "GO:0007154 cell communication [BP]",
+        "count": 455
+      }
+    ],
+    "kegg_terms": [
+      {
+        "term": "EC:2.4.1.-",
+        "count": 168
+      },
+      {
+        "term": "EC:2.7.11.1",
+        "count": 132
+      },
+      {
+        "term": "EC:3.1.3.16",
+        "count": 116
+      },
+      {
+        "term": "EC:2.3.2.27",
+        "count": 101
+      },
+      {
+        "term": "EC:1.11.1.7",
+        "count": 71
+      },
+      {
+        "term": "EC:5.2.1.8",
+        "count": 59
+      },
+      {
+        "term": "EC:3.1.1.11",
+        "count": 56
+      },
+      {
+        "term": "EC:2.1.1.-",
+        "count": 50
+      },
+      {
+        "term": "EC:3.4.19.12",
+        "count": 40
+      },
+      {
+        "term": "EC:3.2.1.39",
+        "count": 40
+      },
+      {
+        "term": "ko:K09422",
+        "count": 35
+      },
+      {
+        "term": "EC:2.3.1.-",
+        "count": 35
+      },
+      {
+        "term": "EC:2.3.1.225",
+        "count": 34
+      },
+      {
+        "term": "EC:3.6.4.13",
+        "count": 32
+      },
+      {
+        "term": "EC:3.1.1.-",
+        "count": 31
+      },
+      {
+        "term": "EC:3.6.4.12",
+        "count": 30
+      },
+      {
+        "term": "EC:3.4.16.-",
+        "count": 30
+      },
+      {
+        "term": "EC:1.15.1.1",
+        "count": 27
+      },
+      {
+        "term": "EC:3.2.1.78",
+        "count": 25
+      },
+      {
+        "term": "EC:3.4.25.1",
+        "count": 25
+      },
+      {
+        "term": "EC:2.4.1.207",
+        "count": 24
+      },
+      {
+        "term": "EC:2.7.7.6",
+        "count": 22
+      },
+      {
+        "term": "EC:1.10.3.2",
+        "count": 22
+      },
+      {
+        "term": "ko:K00430",
+        "count": 21
+      },
+      {
+        "term": "EC:3.1.3.2",
+        "count": 21
+      },
+      {
+        "term": "EC:1.-.-.-",
+        "count": 21
+      },
+      {
+        "term": "EC:3.2.1.4",
+        "count": 20
+      },
+      {
+        "term": "EC:2.7.1.40",
+        "count": 19
+      },
+      {
+        "term": "EC:3.2.1.23",
+        "count": 19
+      },
+      {
+        "term": "EC:4.2.2.2",
+        "count": 16
+      }
+    ],
+    "interpro_domains": [
+      {
+        "term": "IPR027417 P-loop_NTPase",
+        "count": 1086
+      },
+      {
+        "term": "IPR000719 Protein kinase domain",
+        "count": 999
+      },
+      {
+        "term": "IPR011009 Kinase-like_dom_sf",
+        "count": 983
+      },
+      {
+        "term": "IPR011990 TPR-like_helical_dom_sf",
+        "count": 792
+      },
+      {
+        "term": "IPR008271 Ser/Thr_kinase_AS",
+        "count": 742
+      },
+      {
+        "term": "PF00069 Protein kinase domain",
+        "count": 681
+      },
+      {
+        "term": "IPR017441 Protein_kinase_ATP_BS",
+        "count": 624
+      },
+      {
+        "term": "IPR002885 Pentatricopeptide repeat",
+        "count": 614
+      },
+      {
+        "term": "PF01535 PPR repeat",
+        "count": 588
+      },
+      {
+        "term": "PF13041 PPR repeat family",
+        "count": 558
+      },
+      {
+        "term": "IPR013083 Znf_RING/FYVE/PHD",
+        "count": 511
+      },
+      {
+        "term": "IPR016024 ARM-type_fold",
+        "count": 432
+      },
+      {
+        "term": "IPR036291 NAD(P)-bd_dom_sf",
+        "count": 381
+      },
+      {
+        "term": "IPR009057 Homeobox-like_sf",
+        "count": 344
+      },
+      {
+        "term": "IPR001245 Serine-threonine/tyrosine-protein kinase, catalytic domain",
+        "count": 341
+      },
+      {
+        "term": "PF07714 Protein tyrosine kinase",
+        "count": 339
+      },
+      {
+        "term": "IPR029058 AB_hydrolase",
+        "count": 338
+      },
+      {
+        "term": "IPR001841 Zinc finger, RING-type",
+        "count": 337
+      },
+      {
+        "term": "IPR032675 LRR_dom_sf",
+        "count": 327
+      },
+      {
+        "term": "IPR025452 Domain of unknown function DUF4218",
+        "count": 327
+      },
+      {
+        "term": "PF13960 Domain of unknown function (DUF4218)",
+        "count": 327
+      },
+      {
+        "term": "IPR000504 RNA recognition motif domain",
+        "count": 303
+      },
+      {
+        "term": "IPR035979 RBD_domain_sf",
+        "count": 296
+      },
+      {
+        "term": "PF00076 RNA recognition motif. (a.k.a. RRM, RBD, or RNP domain)",
+        "count": 296
+      },
+      {
+        "term": "IPR012677 Nucleotide-bd_a/b_plait_sf",
+        "count": 294
+      },
+      {
+        "term": "IPR011989 ARM-like",
+        "count": 290
+      },
+      {
+        "term": "IPR015943 WD40/YVTN_repeat-like_dom_sf",
+        "count": 281
+      },
+      {
+        "term": "IPR029063 SAM-dependent_MTases",
+        "count": 278
+      },
+      {
+        "term": "IPR001680 WD40 repeat",
+        "count": 276
+      },
+      {
+        "term": "IPR003593 AAA+ ATPase domain",
+        "count": 259
+      }
+    ],
+    "pfam_domains": [
+      {
+        "term": "PF00069 Protein kinase domain",
+        "count": 681
+      },
+      {
+        "term": "PF01535 PPR repeat",
+        "count": 588
+      },
+      {
+        "term": "PF13041 PPR repeat family",
+        "count": 558
+      },
+      {
+        "term": "PF07714 Protein tyrosine kinase",
+        "count": 339
+      },
+      {
+        "term": "PF13960 Domain of unknown function (DUF4218)",
+        "count": 327
+      },
+      {
+        "term": "PF00076 RNA recognition motif. (a.k.a. RRM, RBD, or RNP domain)",
+        "count": 296
+      },
+      {
+        "term": "PF00400 WD domain, G-beta repeat",
+        "count": 251
+      },
+      {
+        "term": "PF00067 Cytochrome P450",
+        "count": 242
+      },
+      {
+        "term": "PF00249 Myb-like DNA-binding domain",
+        "count": 211
+      },
+      {
+        "term": "PF00271 Helicase conserved C-terminal domain",
+        "count": 203
+      },
+      {
+        "term": "PF14432 DYW family of nucleic acid deaminases",
+        "count": 197
+      },
+      {
+        "term": "PF02992 Transposase family tnp2",
+        "count": 187
+      },
+      {
+        "term": "PF13855 Leucine rich repeat",
+        "count": 175
+      },
+      {
+        "term": "PF13359 DDE superfamily endonuclease",
+        "count": 169
+      },
+      {
+        "term": "PF13639 Ring finger domain",
+        "count": 166
+      },
+      {
+        "term": "PF08263 Leucine rich repeat N-terminal domain",
+        "count": 163
+      },
+      {
+        "term": "PF00847 AP2 domain",
+        "count": 155
+      },
+      {
+        "term": "PF13499 EF-hand domain pair",
+        "count": 148
+      },
+      {
+        "term": "PF00270 DEAD/DEAH box helicase",
+        "count": 135
+      },
+      {
+        "term": "PF05699 hAT family C-terminal dimerisation region",
+        "count": 133
+      },
+      {
+        "term": "PF00004 ATPase family associated with various cellular activities (AAA)",
+        "count": 129
+      },
+      {
+        "term": "PF00005 ABC transporter",
+        "count": 129
+      },
+      {
+        "term": "PF00010 Helix-loop-helix DNA-binding domain",
+        "count": 120
+      },
+      {
+        "term": "PF04937 Protein of unknown function (DUF 659)",
+        "count": 115
+      },
+      {
+        "term": "PF12854 PPR repeat",
+        "count": 105
+      },
+      {
+        "term": "PF00153 Mitochondrial carrier protein",
+        "count": 103
+      },
+      {
+        "term": "PF00071 Ras family",
+        "count": 101
+      },
+      {
+        "term": "PF00226 DnaJ domain",
+        "count": 101
+      },
+      {
+        "term": "PF00201 UDP-glucoronosyl and UDP-glucosyl transferase",
+        "count": 98
+      },
+      {
+        "term": "PF00141 Peroxidase",
+        "count": 97
+      }
+    ],
+    "plantTFDB_family": [
+      {
+        "term": "bHLH",
+        "count": 59
+      },
+      {
+        "term": "MYB",
+        "count": 57
+      },
+      {
+        "term": "NAC",
+        "count": 55
+      },
+      {
+        "term": "C2H2",
+        "count": 51
+      },
+      {
+        "term": "ERF",
+        "count": 43
+      },
+      {
+        "term": "LBD",
+        "count": 26
+      },
+      {
+        "term": "HD-ZIP",
+        "count": 23
+      },
+      {
+        "term": "WRKY",
+        "count": 22
+      },
+      {
+        "term": "MYB_related",
+        "count": 21
+      },
+      {
+        "term": "C3H",
+        "count": 19
+      },
+      {
+        "term": "bZIP",
+        "count": 18
+      },
+      {
+        "term": "G2-like",
+        "count": 15
+      },
+      {
+        "term": "GRAS",
+        "count": 14
+      },
+      {
+        "term": "Dof",
+        "count": 14
+      },
+      {
+        "term": "HSF",
+        "count": 13
+      },
+      {
+        "term": "ARF",
+        "count": 13
+      },
+      {
+        "term": "AP2",
+        "count": 13
+      },
+      {
+        "term": "TCP",
+        "count": 12
+      },
+      {
+        "term": "GATA",
+        "count": 11
+      },
+      {
+        "term": "GRF",
+        "count": 9
+      },
+      {
+        "term": "E2F/DP",
+        "count": 9
+      },
+      {
+        "term": "FAR1",
+        "count": 9
+      },
+      {
+        "term": "TALE",
+        "count": 9
+      },
+      {
+        "term": "Trihelix",
+        "count": 9
+      },
+      {
+        "term": "MIKC_MADS",
+        "count": 7
+      },
+      {
+        "term": "B3",
+        "count": 7
+      },
+      {
+        "term": "HB-other",
+        "count": 7
+      },
+      {
+        "term": "WOX",
+        "count": 7
+      },
+      {
+        "term": "NF-YB",
+        "count": 6
+      },
+      {
+        "term": "BES1",
+        "count": 5
+      }
+    ],
+    "target_species": [
+      {
+        "term": "Anthurium amnicola",
+        "count": 10239
+      },
+      {
+        "term": "Elaeis guineensis",
+        "count": 2774
+      },
+      {
+        "term": "Phoenix dactylifera",
+        "count": 2258
+      },
+      {
+        "term": "Nelumbo nucifera",
+        "count": 897
+      },
+      {
+        "term": "Musa acuminata subsp. malaccensis",
+        "count": 808
+      },
+      {
+        "term": "Ananas comosus",
+        "count": 709
+      },
+      {
+        "term": "Cinnamomum micranthum f. kanehirae",
+        "count": 644
+      },
+      {
+        "term": "Asparagus officinalis",
+        "count": 402
+      },
+      {
+        "term": "Macleaya cordata",
+        "count": 348
+      },
+      {
+        "term": "Musa balbisiana",
+        "count": 334
+      },
+      {
+        "term": "Vitis vinifera",
+        "count": 227
+      },
+      {
+        "term": "Dendrobium catenatum",
+        "count": 215
+      },
+      {
+        "term": "Ensete ventricosum",
+        "count": 205
+      },
+      {
+        "term": "Apostasia shenzhenica",
+        "count": 188
+      },
+      {
+        "term": "Ananas comosus var. bracteatus",
+        "count": 187
+      },
+      {
+        "term": "Davidia involucrata",
+        "count": 175
+      },
+      {
+        "term": "Zostera marina",
+        "count": 159
+      },
+      {
+        "term": "Cajanus cajan",
+        "count": 133
+      },
+      {
+        "term": "Juglans regia",
+        "count": 129
+      },
+      {
+        "term": "Punica granatum",
+        "count": 123
+      },
+      {
+        "term": "Trifolium pratense",
+        "count": 122
+      },
+      {
+        "term": "Hevea brasiliensis",
+        "count": 118
+      },
+      {
+        "term": "Nyssa sinensis",
+        "count": 114
+      },
+      {
+        "term": "Triticum aestivum",
+        "count": 106
+      },
+      {
+        "term": "Aquilegia coerulea",
+        "count": 106
+      },
+      {
+        "term": "Manihot esculenta",
+        "count": 103
+      },
+      {
+        "term": "Phalaenopsis equestris",
+        "count": 101
+      },
+      {
+        "term": "Aegilops tauschii subsp. strangulata",
+        "count": 96
+      },
+      {
+        "term": "Arachis hypogaea",
+        "count": 93
+      },
+      {
+        "term": "Solanum tuberosum",
+        "count": 80
+      }
+    ],
+    "target_family": [
+      {
+        "term": "Araceae",
+        "count": 10432
+      },
+      {
+        "term": "Arecaceae",
+        "count": 5051
+      },
+      {
+        "term": "Musaceae",
+        "count": 1352
+      },
+      {
+        "term": "Bromeliaceae",
+        "count": 897
+      },
+      {
+        "term": "Nelumbonaceae",
+        "count": 897
+      },
+      {
+        "term": "Fabaceae",
+        "count": 733
+      },
+      {
+        "term": "Poaceae",
+        "count": 693
+      },
+      {
+        "term": "Lauraceae",
+        "count": 651
+      },
+      {
+        "term": "Orchidaceae",
+        "count": 532
+      },
+      {
+        "term": "Malvaceae",
+        "count": 407
+      },
+      {
+        "term": "Asparagaceae",
+        "count": 403
+      },
+      {
+        "term": "Papaveraceae",
+        "count": 387
+      },
+      {
+        "term": "Solanaceae",
+        "count": 371
+      },
+      {
+        "term": "Euphorbiaceae",
+        "count": 307
+      },
+      {
+        "term": "Vitaceae",
+        "count": 306
+      },
+      {
+        "term": "Nyssaceae",
+        "count": 289
+      },
+      {
+        "term": "Rosaceae",
+        "count": 262
+      },
+      {
+        "term": "Fagaceae",
+        "count": 169
+      },
+      {
+        "term": "Zosteraceae",
+        "count": 159
+      },
+      {
+        "term": "Salicaceae",
+        "count": 130
+      },
+      {
+        "term": "Juglandaceae",
+        "count": 129
+      },
+      {
+        "term": "Lythraceae",
+        "count": 123
+      },
+      {
+        "term": "Ranunculaceae",
+        "count": 107
+      },
+      {
+        "term": "Brassicaceae",
+        "count": 105
+      },
+      {
+        "term": "Cucurbitaceae",
+        "count": 104
+      },
+      {
+        "term": "Rutaceae",
+        "count": 95
+      },
+      {
+        "term": "Myrtaceae",
+        "count": 95
+      },
+      {
+        "term": "Asteraceae",
+        "count": 93
+      },
+      {
+        "term": "Cannabaceae",
+        "count": 83
+      },
+      {
+        "term": "Rhamnaceae",
+        "count": 71
+      }
+    ],
+    "chromosome": [
+      {
+        "term": "HIC_ASM_4",
+        "count": 4969
+      },
+      {
+        "term": "HIC_ASM_5",
+        "count": 4470
+      },
+      {
+        "term": "HIC_ASM_9",
+        "count": 3157
+      },
+      {
+        "term": "HIC_ASM_1",
+        "count": 3106
+      },
+      {
+        "term": "HIC_ASM_11",
+        "count": 2763
+      },
+      {
+        "term": "HIC_ASM_6",
+        "count": 2722
+      },
+      {
+        "term": "HIC_ASM_10",
+        "count": 2564
+      },
+      {
+        "term": "HIC_ASM_0",
+        "count": 2265
+      },
+      {
+        "term": "HIC_ASM_3",
+        "count": 2046
+      },
+      {
+        "term": "HIC_ASM_2",
+        "count": 2018
+      },
+      {
+        "term": "HIC_ASM_7",
+        "count": 2017
+      },
+      {
+        "term": "HIC_ASM_12",
+        "count": 1812
+      },
+      {
+        "term": "HIC_ASM_8",
+        "count": 1764
+      },
+      {
+        "term": "CTG_7307",
+        "count": 71
+      },
+      {
+        "term": "CTG_11508",
+        "count": 47
+      },
+      {
+        "term": "CTG_20042",
+        "count": 39
+      },
+      {
+        "term": "CTG_5330",
+        "count": 30
+      },
+      {
+        "term": "CTG_258",
+        "count": 28
+      },
+      {
+        "term": "CTG_7580",
+        "count": 24
+      },
+      {
+        "term": "CTG_8406",
+        "count": 24
+      },
+      {
+        "term": "CTG_15028",
+        "count": 19
+      },
+      {
+        "term": "CTG_16144",
+        "count": 19
+      },
+      {
+        "term": "CTG_3324",
+        "count": 19
+      },
+      {
+        "term": "CTG_17559",
+        "count": 17
+      },
+      {
+        "term": "CTG_3783",
+        "count": 17
+      },
+      {
+        "term": "CTG_809",
+        "count": 17
+      },
+      {
+        "term": "CTG_5073",
+        "count": 16
+      },
+      {
+        "term": "CTG_11021",
+        "count": 15
+      },
+      {
+        "term": "CTG_1322",
+        "count": 15
+      },
+      {
+        "term": "CTG_13366",
+        "count": 15
+      }
+    ]
+  }
+}

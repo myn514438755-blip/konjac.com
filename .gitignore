@@ -1,0 +1,28 @@
+﻿# Local environment and dependencies
+node_modules/
+.env
+.env.*
+!.env.example
+.DS_Store
+Thumbs.db
+
+# Large raw / reference genome files kept locally
+/data/raw/
+/GCA_022559845.1_ASM2255984v1_genomic.fna*
+
+# Large JBrowse reference assemblies; regenerate or host separately
+/data/processed/jbrowse/assemblies/*.fna*
+/data/processed/jbrowse-app/assemblies/*.fna*
+
+# Very large generated annotation index; overlay chunks are kept instead
+/data/processed/annotations/zen/annotation_index.json
+
+# JBrowse app bundled examples and source maps are not required for this site
+/data/processed/jbrowse-app/test_data/
+/data/processed/jbrowse-app/static/**/*.map
+
+# Local BLAST runtime output can be regenerated
+/blast_results/
+
+# Codex export git database
+.gitdata/

@@ -1,0 +1,320 @@
+﻿<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Konjac Gene Explorer | 魔芋基因查询数据库 v1.2.1</title>
+  <meta name="description" content="魔芋 Amorphophallus konjac 基因组功能注释查询数据库，整合 PlantGARDEN t78372.G001、ZEN v2.0、GO、KEGG/KO/EC、InterPro、Pfam、PlantTFDB 与序列下载。" />
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <header class="hero">
+    <nav class="nav">
+      <a class="brand" href="#/" aria-label="Konjac Gene Explorer 首页">
+        <span class="brand-mark">K</span>
+        <span>Konjac Gene Explorer</span>
+      </a>
+      <div class="nav-links" aria-label="主要导航">
+        <a href="#/">首页</a>
+        <a href="#search">查询</a>
+        <a href="#topics">专题</a>
+        <a href="#browse">浏览</a>
+        <a href="./data/processed/jbrowse-app/index.html">基因组浏览器</a>
+        <a href="#blast">BLAST</a>
+        <a href="#downloads">下载</a>
+        <a href="#sources">来源</a>
+        <a href="#help">帮助</a>
+      </div>
+    </nav>
+  </header>
+
+  <main>
+    <section class="panel home-shell" id="homeView" data-view="home">
+      <div class="home-hero-grid">
+        <div class="section-heading">
+          <p class="eyebrow">Home</p>
+          <h1 class="home-title">Konjac Gene Explorer</h1>
+          <p class="home-copy">魔芋 Amorphophallus konjac 基因组功能注释查询数据库</p>
+        </div>
+        <figure class="home-visual">
+          <img src="./assets/ai/konjac-hero-genome.png" alt="魔芋植株与基因组浏览轨道的科研风格图像" />
+          <figcaption>PlantGARDEN clean GFF · ZEN annotation v2.0 · JBrowse</figcaption>
+        </figure>
+      </div>
+
+      <section class="hero-stats" aria-label="数据库统计">
+        <article><strong id="statGenes">-</strong><span>基因条目</span></article>
+        <article><strong id="statGo">-</strong><span>GO 注释</span></article>
+        <article><strong id="statKegg">-</strong><span>KEGG/KO/EC</span></article>
+        <article><strong id="statInterpro">-</strong><span>InterPro</span></article>
+        <article><strong id="statTf">-</strong><span>PlantTFDB 转录因子</span></article>
+        <article><strong id="statUpdated">-</strong><span>数据更新时间</span></article>
+      </section>
+
+      <div class="home-search">
+        <div class="search-main home-search-main">
+          <input id="homeSearchInput" type="search" placeholder="搜索 gene ID、KGM、GO:0003677、PF00069、WRKY..." autocomplete="off" />
+          <button class="button primary" id="homeSearchButton">开始查询</button>
+        </div>
+        <div class="quick-row" id="homeQuickSearches" aria-label="常用搜索"></div>
+      </div>
+
+      <div class="module-grid" id="homeModules"></div>
+    </section>
+
+    <section class="panel view-shell" id="searchView" data-view="search" hidden>
+      <div class="section-heading">
+        <p class="eyebrow">Search</p>
+        <h2>基因查询</h2>
+        <p>输入 Gene ID、功能关键词、GO、KEGG、Pfam 或转录因子家族后，再显示结果表格。支持同义词扩展搜索。</p>
+      </div>
+
+      <div class="quick-row" id="quickSearches" aria-label="常用搜索"></div>
+
+      <div class="search-box">
+        <div class="search-main">
+          <input id="searchInput" type="search" placeholder="例如：evm.model.HIC_ASM_10.860_Akon、KGM、CSLA、GO:0003677、PF00069、WRKY" autocomplete="off" />
+          <button class="button primary" id="searchButton">搜索</button>
+          <button class="button ghost" id="resetButton">重置</button>
+        </div>
+        <div class="search-options">
+          <label>字段
+            <select id="fieldFilter" aria-label="选择搜索字段">
+              <option value="all">全字段</option>
+              <option value="gene">Gene ID / 别名</option>
+              <option value="function">功能注释</option>
+              <option value="go">GO / GO slim</option>
+              <option value="kegg">KEGG / KO / EC</option>
+              <option value="domain">InterPro / Pfam</option>
+              <option value="tf">转录因子</option>
+              <option value="homology">同源命中</option>
+              <option value="location">染色体/坐标</option>
+            </select>
+          </label>
+          <label>物种
+            <select id="speciesFilter" aria-label="按物种筛选">
+              <option value="">全部物种</option>
+            </select>
+          </label>
+          <label>注释状态
+            <select id="annotationFilter" aria-label="按注释状态筛选">
+              <option value="">全部</option>
+              <option value="go">有 GO</option>
+              <option value="kegg">有 KEGG/KO/EC</option>
+              <option value="interpro">有 InterPro</option>
+              <option value="pfam">有 Pfam</option>
+              <option value="tf">PlantTFDB 转录因子</option>
+              <option value="homolog">有同源命中</option>
+              <option value="hic">HIC_ASM 染色体组装片段</option>
+              <option value="ctg">CTG 片段</option>
+            </select>
+          </label>
+          <label>排序
+            <select id="sortMode" aria-label="排序方式">
+              <option value="relevance">相关度</option>
+              <option value="gene_id">Gene ID</option>
+              <option value="location">染色体/坐标</option>
+              <option value="protein_desc">蛋白长度 ↓</option>
+              <option value="identity_desc">Identity ↓</option>
+              <option value="bitscore_desc">Bitscore ↓</option>
+            </select>
+          </label>
+          <label>每页
+            <select id="pageSize" aria-label="每页显示条数">
+              <option value="50">50</option>
+              <option value="100" selected>100</option>
+              <option value="250">250</option>
+            </select>
+          </label>
+        </div>
+      </div>
+
+      <p id="searchPrompt" class="search-prompt">请输入 Gene ID、功能关键词、GO、KEGG、Pfam 或转录因子家族进行查询。</p>
+      <div id="activeTopic" class="active-topic" hidden></div>
+      <div id="queryHint" class="query-hint" hidden></div>
+      <div id="loadStatus" class="load-status" role="status" aria-live="polite">
+        <div class="load-status-head">
+          <span id="loadStatusText">正在准备加载数据...</span>
+          <span id="loadStatusPercent">0%</span>
+        </div>
+        <div class="load-bar" aria-hidden="true"><span id="loadStatusBar"></span></div>
+      </div>
+
+      <div class="toolbar">
+        <span id="resultCount">当前尚未执行搜索</span>
+        <div class="toolbar-actions">
+          <button class="button ghost small" id="prevPage">上一页</button>
+          <span id="pageInfo" class="muted">-</span>
+          <button class="button ghost small" id="nextPage">下一页</button>
+          <button class="button secondary small" id="downloadFiltered">下载当前结果 CSV</button>
+        </div>
+      </div>
+      <div id="filterSummary" class="filter-summary" hidden></div>
+      <div id="searchStatus" class="search-status" hidden></div>
+
+      <div id="resultsPanel" hidden>
+        <div class="table-wrap">
+          <table id="resultsTable">
+            <thead>
+              <tr>
+                <th>Gene ID</th>
+                <th>名称/别名</th>
+                <th>位置</th>
+                <th>功能摘要</th>
+                <th>证据</th>
+                <th>详情</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div id="emptyHelp" class="empty-help" hidden></div>
+      </div>
+    </section>
+
+    <section class="panel view-shell" id="geneView" data-view="gene" hidden>
+      <div class="section-heading">
+        <p class="eyebrow">Gene detail</p>
+        <h2 id="detailTitle">基因详情</h2>
+      </div>
+      <div class="gene-detail-actions">
+        <button class="button ghost small" id="backToSearch">返回搜索结果</button>
+        <a class="button secondary small" href="#search">返回搜索页</a>
+      </div>
+      <div id="detailContent" class="detail-grid"></div>
+    </section>
+
+    <section class="panel view-shell" id="topicsView" data-view="topics" hidden>
+      <div class="section-heading">
+        <p class="eyebrow">Topic shortcuts</p>
+        <h2>魔芋研究专题</h2>
+        <p>点击专题卡片后会跳转到搜索页并自动执行对应关键词搜索。</p>
+      </div>
+      <div id="topicCards" class="topic-grid"></div>
+    </section>
+
+    <section class="panel view-shell" id="browseView" data-view="browse" hidden>
+      <div class="section-heading">
+        <p class="eyebrow">Browse</p>
+        <h2>注释分类浏览</h2>
+        <p>点击标签会跳转到搜索页并自动执行查询。</p>
+      </div>
+      <div id="browsePanels" class="browse-grid"></div>
+    </section>
+
+    <section class="panel view-shell" id="downloadsView" data-view="downloads" hidden>
+      <div class="section-heading">
+        <p class="eyebrow">Downloads</p>
+        <h2>数据下载</h2>
+        <p>提供网站整合表、GFF、CDS、protein FASTA 和 ZEN 注释文件。</p>
+      </div>
+      <div class="download-meta">
+        <div><strong>版本</strong><span>v1.2.1</span></div>
+        <div><strong>更新时间</strong><span>2026-04-29</span></div>
+      </div>
+      <div id="downloadCards" class="download-grid"></div>
+    </section>
+    <section class="panel view-shell" id="blastView" data-view="blast" hidden>
+      <div class="section-heading">
+        <p class="eyebrow">BLAST</p>
+        <h2>本地 BLAST 使用说明</h2>
+        <p>当前静态版本提供本地 BLAST+ 流程说明。在线 BLAST 需要后端服务器、任务队列和运行限制，后续单独部署。</p>
+      </div>
+      <div id="blastContent" class="blast-grid"></div>
+    </section>
+
+    <section class="panel view-shell" id="sourcesView" data-view="sources" hidden>
+      <div class="section-heading">
+        <p class="eyebrow">Sources & citation</p>
+        <h2>数据来源与引用信息</h2>
+      </div>
+      <div class="source-grid" id="sourcesContent">
+        <article class="card">
+          <h3>当前数据版本</h3>
+          <dl>
+            <dt>物种</dt><dd>Amorphophallus konjac</dd>
+            <dt>基因组</dt><dd>PlantGARDEN t78372.G001 / NCBI assembly GCA_022559845.1</dd>
+            <dt>基因结构</dt><dd>PlantGARDEN clean.gff</dd>
+            <dt>CDS / protein</dt><dd>clean.cds / clean.pep</dd>
+            <dt>功能注释</dt><dd>ZEN annotation v2.0, GO, GO slim, KEGG/KO/EC, InterPro, Pfam, PlantTFDB</dd>
+            <dt>网站版本</dt><dd>Konjac Gene Explorer v1.2.1 static build</dd>
+            <dt>更新时间</dt><dd>2026-04-29</dd>
+          </dl>
+        </article>
+        <article class="card">
+          <h3>引用与许可</h3>
+          <dl>
+            <dt>PlantGARDEN</dt><dd>待补充</dd>
+            <dt>ZEN</dt><dd>待补充</dd>
+            <dt>NCBI assembly</dt><dd>待补充</dd>
+            <dt>外部资源</dt><dd>GO、KEGG/KO/EC、InterPro、Pfam、PlantTFDB</dd>
+            <dt>Citation</dt><dd>待补充</dd>
+            <dt>License</dt><dd>待补充</dd>
+          </dl>
+        </article>
+        <article class="card full">
+          <h3>解释与使用边界</h3>
+          <ul class="check-list">
+            <li>候选基因来自功能注释、结构域、GO/KEGG、同源命中和专题关键字筛选，不等同于实验验证结果。</li>
+            <li>用于论文、报告或公开数据发布前，应核对 PlantGARDEN、ZEN、NCBI、GO、KEGG、InterPro、Pfam、PlantTFDB 的正式引用和许可要求。</li>
+            <li>DOI、正式许可、维护者和联系邮箱当前均为待补充信息，本站不会编造缺失来源。</li>
+          </ul>
+        </article>
+      </div>
+      <p class="notice">说明：本网站是静态数据浏览器，已接入 JBrowse 静态基因组浏览器；在线 BLAST、表达矩阵和共表达网络可在后续版本继续加入。</p>
+    </section>
+
+    <section class="panel view-shell" id="helpView" data-view="help" hidden>
+      <div class="section-heading">
+        <p class="eyebrow">Help</p>
+        <h2>使用帮助</h2>
+      </div>
+      <div class="help-grid" id="helpContent">
+        <article class="card">
+          <h3>搜索示例</h3>
+          <ul>
+            <li>精确 gene ID：<code>evm.model.HIC_ASM_10.860_Akon</code></li>
+            <li>结构域：<code>PF00069</code>、<code>IPR000719</code></li>
+            <li>GO：<code>GO:0003677</code> 或 <code>DNA binding</code></li>
+            <li>魔芋关键词：<code>KGM</code>、<code>CSLA</code>、<code>WRKY</code></li>
+            <li>转录因子：<code>WRKY</code>、<code>MYB</code>、<code>bHLH</code></li>
+          </ul>
+        </article>
+        <article class="card">
+          <h3>本地运行</h3>
+          <p>进入项目根目录后运行：</p>
+          <pre><code>npx http-server . -p 8002 -c-1 --cors</code></pre>
+          <p>然后在浏览器中打开：</p>
+          <pre><code>http://127.0.0.1:8002/#/</code></pre>
+        </article>
+        <article class="card">
+          <h3>常见问题与后续升级</h3>
+          <ul>
+            <li>当前页面是纯静态站，搜索结果和详情都来自本地数据文件。</li>
+            <li>如果 URL 中带有 <code>#search?q=...</code> 或 <code>#gene/...</code>，刷新后会恢复到对应视图。</li>
+            <li>JBrowse 已接入静态基因组浏览器；在线 BLAST 和表达模块后续需要额外服务或数据。</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+  </main>
+
+  <div id="toast" class="toast" hidden></div>
+
+  <footer>
+    <p>Konjac Gene Explorer v1.2.1 · Static real-data build · PlantGARDEN t78372.G001 / ZEN annotation v2.0.</p>
+  </footer>
+
+  <script src="./app.js"></script>
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,56 @@
+{
+    "schema":  "konjac.blast_manifest.v1",
+    "built_at":  "2026-05-03T08:11:14.5621273Z",
+    "blast_version":  "blastn: 2.9.0+",
+    "tools":  {
+                  "makeblastdb":  "C:\\Program Files\\NCBI\\blast-2.9.0+\\bin\\makeblastdb.exe",
+                  "blastn":  "C:\\Program Files\\NCBI\\blast-2.9.0+\\bin\\blastn.exe",
+                  "blastp":  "C:\\Program Files\\NCBI\\blast-2.9.0+\\bin\\blastp.exe"
+              },
+    "inputs":  {
+                   "cds":  "downloads/Amorphophallus_konjac.clean.cds",
+                   "protein":  "downloads/Amorphophallus_konjac.clean.pep"
+               },
+    "databases":  [
+                      {
+                          "id":  "konjac_cds",
+                          "label":  "Konjac CDS nucleotide database",
+                          "dbtype":  "nucl",
+                          "prefix":  "blastdb/konjac_cds",
+                          "files":  [
+                                        {
+                                            "name":  "konjac_cds.nhr",
+                                            "bytes":  4132006
+                                        },
+                                        {
+                                            "name":  "konjac_cds.nin",
+                                            "bytes":  532080
+                                        },
+                                        {
+                                            "name":  "konjac_cds.nsq",
+                                            "bytes":  12153120
+                                        }
+                                    ]
+                      },
+                      {
+                          "id":  "konjac_pep",
+                          "label":  "Konjac protein database",
+                          "dbtype":  "prot",
+                          "prefix":  "blastdb/konjac_pep",
+                          "files":  [
+                                        {
+                                            "name":  "konjac_pep.phr",
+                                            "bytes":  4132006
+                                        },
+                                        {
+                                            "name":  "konjac_pep.pin",
+                                            "bytes":  354748
+                                        },
+                                        {
+                                            "name":  "konjac_pep.psq",
+                                            "bytes":  16211243
+                                        }
+                                    ]
+                      }
+                  ]
+}

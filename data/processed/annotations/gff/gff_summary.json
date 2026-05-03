@@ -1,0 +1,19 @@
+{
+  "schema": "konjac.gff_summary.v1",
+  "built_at": "2026-05-02T15:31:57.923Z",
+  "source_file": "data/raw/plantgarden/Amorphophallus_konjac.clean.gff.gz",
+  "main_record_type": "mRNA",
+  "main_record_count": 44332,
+  "gene_feature_count": 0,
+  "transcript_feature_count": 44332,
+  "cds_feature_count": 186612,
+  "exon_feature_count": 0,
+  "unresolved_cds_count": 0,
+  "feature_counts": {
+    "CDS": 186612,
+    "mRNA": 44332
+  },
+  "notes": [
+    "No gene features were present; main records are transcript-centric mRNA records."
+  ]
+}

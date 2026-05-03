@@ -1,0 +1,31 @@
+﻿* text=auto eol=lf
+
+*.html text eol=lf
+*.css text eol=lf
+*.js text eol=lf
+*.mjs text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+*.txt text eol=lf
+*.tsv text eol=lf
+*.fa text eol=lf
+*.fasta text eol=lf
+*.gff text eol=lf
+*.gff3 text eol=lf
+*.ps1 text eol=lf
+
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.ico binary
+*.gz binary
+*.bgz binary
+*.csi binary
+*.fai binary
+*.gzi binary
+*.nhr binary
+*.nin binary
+*.nsq binary
+*.phr binary
+*.pin binary
+*.psq binary

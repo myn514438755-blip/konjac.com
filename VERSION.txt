@@ -1,0 +1,2 @@
+Konjac Gene Explorer v1.2.1
+Current baseline: static real-data build with sequence viewer contrast fix and first-stage usability updates.

@@ -1,0 +1,56 @@
+{
+  "assemblies": [
+    {
+      "name": "GCA_022559845.1_ASM2255984v1",
+      "sequence": {
+        "type": "ReferenceSequenceTrack",
+        "trackId": "GCA_022559845.1_ASM2255984v1-ReferenceSequenceTrack",
+        "adapter": {
+          "type": "BgzipFastaAdapter",
+          "fastaLocation": {
+            "uri": "assemblies/GCA_022559845.1_ASM2255984v1_genomic.fna.bgz",
+            "locationType": "UriLocation"
+          },
+          "faiLocation": {
+            "uri": "assemblies/GCA_022559845.1_ASM2255984v1_genomic.fna.bgz.fai",
+            "locationType": "UriLocation"
+          },
+          "gziLocation": {
+            "uri": "assemblies/GCA_022559845.1_ASM2255984v1_genomic.fna.bgz.gzi",
+            "locationType": "UriLocation"
+          }
+        }
+      },
+      "displayName": "Amorphophallus konjac (GCA_022559845.1)"
+    }
+  ],
+  "configuration": {},
+  "connections": [],
+  "defaultSession": {
+    "name": "New Session"
+  },
+  "tracks": [
+    {
+      "type": "FeatureTrack",
+      "trackId": "Amorphophallus_konjac.clean.gff3",
+      "name": "PlantGARDEN clean GFF (remapped)",
+      "adapter": {
+        "type": "Gff3TabixAdapter",
+        "gffGzLocation": {
+          "uri": "tracks/gff/Amorphophallus_konjac.clean.remapped.gff3.bgz",
+          "locationType": "UriLocation"
+        },
+        "index": {
+          "location": {
+            "uri": "tracks/gff/Amorphophallus_konjac.clean.remapped.gff3.bgz.csi",
+            "locationType": "UriLocation"
+          },
+          "indexType": "CSI"
+        }
+      },
+      "assemblyNames": [
+        "GCA_022559845.1_ASM2255984v1"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,34 @@
+{
+  "schema": "konjac.annotation_summary.v1",
+  "built_at": "2026-05-02T15:31:58.925Z",
+  "source_file": "data/raw/plantgarden/Amorphophallus_konjac_t78372.G001_zen_v2.0.tar.gz",
+  "source_members": [
+    "zen_annotation_v2.0.tsv",
+    "zen_go_v2.0.tsv",
+    "zen_goslim_v2.0.tsv",
+    "zen_interpro_v2.0.tsv",
+    "zen_pfam_v2.0.tsv"
+  ],
+  "main_annotation_gene_count": 44332,
+  "go_annotation_gene_count": 17832,
+  "goslim_annotation_gene_count": 17829,
+  "interpro_annotation_gene_count": 23936,
+  "pfam_annotation_gene_count": 22375,
+  "plantTFDB_annotation_gene_count": 44332,
+  "ko_gene_count": 44332,
+  "ec_gene_count": 44332,
+  "queryid_pep_row_count": 44353,
+  "queryid_cds_row_count": 44353,
+  "same_queryid_count": 44353,
+  "different_queryid_count": 0,
+  "blank_queryid_pep_count": 0,
+  "blank_queryid_cds_count": 0,
+  "gene_id_count": 44332,
+  "row_counts": {
+    "annotation": 44353,
+    "go": 47112,
+    "goslim": 62419,
+    "interpro": 74006,
+    "pfam": 31540
+  }
+}
