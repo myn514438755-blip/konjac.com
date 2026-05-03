@@ -4,6 +4,10 @@ const OVERLAY_INDEX_URL = './data/processed/annotations/overlay/annotation_overl
 const JBROWSE_SEQID_MAP_URL = './data/processed/jbrowse/seqid_map.json';
 const SEARCH_STATE_KEY = 'konjac_gene_search_state_v1';
 const DATA_BYTES_HINT = 63035084;
+const SUPABASE_URL = 'https://plvylqvdlavriupvphxj.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBsdnlscXZkbGF2cml1cHZwaHhqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc3OTgwMTMsImV4cCI6MjA5MzM3NDAxM30.hvrueYBgtzA9x5ISenK6fI6ofRO9OJ3maelA-D_CjVY';
+const BLAST_FUNCTION_URL = `${SUPABASE_URL}/functions/v1/blast`;
+const BLAST_JOB_STORAGE_KEY = 'konjac_blast_last_job_v1';
 
 const VIEW_IDS = ['homeView', 'searchView', 'geneView', 'topicsView', 'browseView', 'downloadsView', 'blastView', 'sourcesView', 'helpView'];
 const SEQUENCE_FILES = {
@@ -75,7 +79,8 @@ const state = {
   overlayIndex: null,
   overlayIndexPromise: null,
   overlayChunkCache: new Map(),
-  overlayChunkPromise: new Map()
+  overlayChunkPromise: new Map(),
+  blastPollTimer: null
 };
 
 function qs(id) { return $(id.startsWith('#') ? id : `#${id}`); }
@@ -790,8 +795,8 @@ function renderHelpContent() {
     </article>
     <article class="card">
       <h3>BLAST</h3>
-      <p>当前版本提供本地 BLAST+ 使用说明。</p>
-      <a class="button ghost small" href="#blast">查看 BLAST 说明</a>
+      <p>当前版本提供本地 BLAST+ 和 Supabase 在线队列骨架。</p>
+      <a class="button ghost small" href="#blast">打开 BLAST</a>
     </article>
     <article class="card full">
       <h3>后续升级</h3>
@@ -810,6 +815,38 @@ function renderBlastContent() {
   const cdsSize = formatBytes(49918089);
   const pepSize = formatBytes(17583227);
   host.innerHTML = `
+    <article class="card full blast-card blast-online-card">
+      <div class="blast-card-head">
+        <div>
+          <h3>在线 BLAST 队列</h3>
+          <p class="help-note">提交后由 Supabase 记录任务状态，外部 worker 执行 BLAST 并回写结果。</p>
+        </div>
+        <span class="status-pill">Supabase</span>
+      </div>
+      <form id="blastOnlineForm" class="blast-form">
+        <label>
+          <span>程序</span>
+          <select id="blastProgram">
+            <option value="blastn">blastn against CDS</option>
+            <option value="blastp">blastp against protein</option>
+          </select>
+        </label>
+        <label>
+          <span>最大命中数</span>
+          <input id="blastMaxTargets" type="number" min="1" max="50" value="50">
+        </label>
+        <label class="blast-sequence-field">
+          <span>查询序列</span>
+          <textarea id="blastSequence" rows="8" spellcheck="false" placeholder=">query&#10;ATGG..."></textarea>
+        </label>
+        <div class="blast-actions">
+          <button class="button" type="submit">提交 BLAST</button>
+          <button class="button ghost" id="blastCheckLast" type="button">刷新上次任务</button>
+          <span id="blastDatabaseHint" class="status-pill">数据库：konjac_cds</span>
+        </div>
+      </form>
+      <div id="blastOnlineStatus" class="blast-online-status"></div>
+    </article>
     <article class="card full blast-card blast-status-card">
       <h3>本地 BLAST 状态</h3>
       <div id="blastManifestStatus" class="blast-status-list">
@@ -846,6 +883,14 @@ function renderBlastContent() {
       <p>输出 <code>blast_results/example_cds.tsv</code> 和 <code>blast_results/example_pep.tsv</code>。</p>
     </article>
     <article class="card blast-card">
+      <h3>启动 Supabase worker</h3>
+      <pre><code>cd D:/konjac-gene-explorer
+$env:SUPABASE_URL="https://plvylqvdlavriupvphxj.supabase.co"
+$env:SUPABASE_SERVICE_ROLE_KEY="..."
+./scripts/run-supabase-blast-worker.ps1</code></pre>
+      <p>worker 会读取 <code>queued</code> 任务，运行本地 BLAST+，并把命中结果写回 Supabase。</p>
+    </article>
+    <article class="card blast-card">
       <h3>手动 blastn</h3>
       <pre><code>blastn -query examples/blast/query_cds.fa -db blastdb/konjac_cds -out blast_results/my_cds.tsv -outfmt "6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore" -max_target_seqs 50</code></pre>
     </article>
@@ -856,9 +901,11 @@ function renderBlastContent() {
     <article class="card full blast-card">
       <h3>输出字段</h3>
       <p><code>outfmt 6</code> 字段依次为：query ID、subject ID、identity、alignment length、mismatch、gap open、query start/end、subject start/end、E-value、bitscore。</p>
-      <p class="help-note">在线 BLAST 以后需要 FastAPI/Docker/服务器任务队列，并限制序列长度、超时、程序白名单、数据库白名单和返回条数。</p>
+      <p class="help-note">在线 BLAST 已接入 Supabase 队列骨架；计算任务仍需要本机或服务器 worker 执行。</p>
     </article>
   `;
+  bindBlastOnlineForm();
+  void restoreLastBlastJob();
   void hydrateBlastManifest();
 }
 
@@ -887,6 +934,198 @@ async function hydrateBlastManifest() {
       <span class="status-pill">运行 scripts\\build-blast-db.ps1 后会生成 blastdb/manifest.json</span>
     `;
   }
+}
+
+function blastDatabaseForProgram(program) {
+  return program === 'blastp' ? 'konjac_pep' : 'konjac_cds';
+}
+
+function updateBlastDatabaseHint() {
+  const program = qs('blastProgram')?.value || 'blastn';
+  const hint = qs('blastDatabaseHint');
+  if (hint) hint.textContent = `数据库：${blastDatabaseForProgram(program)}`;
+}
+
+function bindBlastOnlineForm() {
+  const form = qs('blastOnlineForm');
+  const program = qs('blastProgram');
+  const checkLast = qs('blastCheckLast');
+  if (!form) return;
+  program?.addEventListener('change', updateBlastDatabaseHint);
+  form.addEventListener('submit', submitOnlineBlast);
+  checkLast?.addEventListener('click', () => {
+    const record = readLastBlastJob();
+    if (record) {
+      void fetchBlastJob(record, true);
+    } else {
+      renderBlastOnlineStatus('<p class="help-note">当前浏览器没有保存上次 BLAST 任务。</p>');
+    }
+  });
+  updateBlastDatabaseHint();
+}
+
+function readLastBlastJob() {
+  try {
+    const raw = localStorage.getItem(BLAST_JOB_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch (error) {
+    return null;
+  }
+}
+
+function saveLastBlastJob(record) {
+  try {
+    localStorage.setItem(BLAST_JOB_STORAGE_KEY, JSON.stringify(record));
+  } catch (error) {
+    // Local storage can be disabled; the active page still shows the job.
+  }
+}
+
+async function restoreLastBlastJob() {
+  const record = readLastBlastJob();
+  if (!record?.job_id || !record?.token) return;
+  renderBlastOnlineStatus('<p class="help-note">正在恢复上次 BLAST 任务...</p>');
+  await fetchBlastJob(record, false);
+}
+
+function validateBlastSequenceInput(value, program) {
+  const input = String(value || '').trim();
+  if (!input) throw new Error('请输入 FASTA 或纯序列。');
+  const lines = input.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+  const sequenceLines = lines[0]?.startsWith('>') ? lines.slice(1) : lines;
+  const sequence = sequenceLines.join('').replace(/\s+/g, '').toUpperCase();
+  if (!sequence) throw new Error('查询序列为空。');
+  if (sequence.length > 20000) throw new Error('查询序列不能超过 20,000 bp/aa。');
+  const validNucleotide = /^[ACGTRYSWKMBDHVN.-]+$/i;
+  const validProtein = /^[ABCDEFGHIKLMNPQRSTVWXYZ*.-]+$/i;
+  if (program === 'blastn' && !validNucleotide.test(sequence)) {
+    throw new Error('blastn 只接受核酸序列字符。');
+  }
+  if (program === 'blastp' && !validProtein.test(sequence)) {
+    throw new Error('blastp 只接受蛋白序列字符。');
+  }
+  return sequence.length;
+}
+
+function renderBlastOnlineStatus(html) {
+  const host = qs('blastOnlineStatus');
+  if (host) host.innerHTML = html;
+}
+
+async function submitOnlineBlast(event) {
+  event.preventDefault();
+  const program = qs('blastProgram')?.value || 'blastn';
+  const sequence = qs('blastSequence')?.value || '';
+  const maxTargetSeqs = Number(qs('blastMaxTargets')?.value || 50);
+  try {
+    const queryLength = validateBlastSequenceInput(sequence, program);
+    renderBlastOnlineStatus(`<p class="help-note">正在提交 ${escapeHtml(program)} 查询，长度 ${formatNumber(queryLength)}...</p>`);
+    const res = await fetch(BLAST_FUNCTION_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${SUPABASE_ANON_KEY}`
+      },
+      body: JSON.stringify({
+        action: 'submit',
+        program,
+        sequence,
+        max_target_seqs: maxTargetSeqs
+      })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || `提交失败：HTTP ${res.status}`);
+    const record = { job_id: data.job.id, token: data.token };
+    saveLastBlastJob(record);
+    renderBlastJobResult({ job: data.job, hits: [] });
+    startBlastPolling(record);
+  } catch (error) {
+    renderBlastOnlineStatus(`<p class="download-warning">${escapeHtml(error.message || 'BLAST 提交失败。')}</p>`);
+  }
+}
+
+async function fetchBlastJob(record, showLoading = true) {
+  if (!record?.job_id || !record?.token) return;
+  try {
+    if (showLoading) renderBlastOnlineStatus('<p class="help-note">正在刷新 BLAST 任务状态...</p>');
+    const res = await fetch(BLAST_FUNCTION_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${SUPABASE_ANON_KEY}`
+      },
+      body: JSON.stringify({
+        action: 'status',
+        job_id: record.job_id,
+        token: record.token
+      })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || `查询失败：HTTP ${res.status}`);
+    renderBlastJobResult(data);
+    if (['queued', 'running'].includes(data.job?.status)) startBlastPolling(record);
+    else stopBlastPolling();
+  } catch (error) {
+    stopBlastPolling();
+    renderBlastOnlineStatus(`<p class="download-warning">${escapeHtml(error.message || 'BLAST 状态查询失败。')}</p>`);
+  }
+}
+
+function startBlastPolling(record) {
+  stopBlastPolling();
+  state.blastPollTimer = window.setInterval(() => {
+    void fetchBlastJob(record, false);
+  }, 5000);
+}
+
+function stopBlastPolling() {
+  if (state.blastPollTimer) {
+    window.clearInterval(state.blastPollTimer);
+    state.blastPollTimer = null;
+  }
+}
+
+function renderBlastJobResult(data) {
+  const job = data.job || {};
+  const hits = Array.isArray(data.hits) ? data.hits : [];
+  const status = job.status || 'queued';
+  const created = job.created_at ? new Date(job.created_at).toLocaleString() : 'unknown';
+  const finished = job.finished_at ? new Date(job.finished_at).toLocaleString() : '';
+  const rows = hits.map(hit => `
+    <tr>
+      <td data-label="#">${escapeHtml(hit.rank)}</td>
+      <td data-label="Subject">${escapeHtml(hit.sseqid)}</td>
+      <td data-label="Identity">${escapeHtml(hit.pident)}</td>
+      <td data-label="Length">${escapeHtml(hit.alignment_length)}</td>
+      <td data-label="E-value">${escapeHtml(hit.evalue)}</td>
+      <td data-label="Bitscore">${escapeHtml(hit.bitscore)}</td>
+    </tr>
+  `).join('');
+  renderBlastOnlineStatus(`
+    <div class="blast-job-box">
+      <div class="blast-job-meta">
+        <span class="status-pill ${status === 'succeeded' ? 'ok' : status === 'failed' ? 'warning' : ''}">状态：${escapeHtml(status)}</span>
+        <span class="status-pill">任务：${escapeHtml(job.id || '')}</span>
+        <span class="status-pill">${escapeHtml(job.program || '')} · ${escapeHtml(job.database || '')}</span>
+        <span class="status-pill">长度：${formatNumber(job.query_length || 0)}</span>
+        <span class="status-pill">提交：${escapeHtml(created)}</span>
+        ${finished ? `<span class="status-pill">完成：${escapeHtml(finished)}</span>` : ''}
+      </div>
+      ${job.error_message ? `<p class="download-warning">${escapeHtml(job.error_message)}</p>` : ''}
+      ${hits.length ? `
+        <div class="table-wrap blast-result-wrap">
+          <table>
+            <thead>
+              <tr><th>#</th><th>Subject</th><th>Identity</th><th>Length</th><th>E-value</th><th>Bitscore</th></tr>
+            </thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>
+      ` : `<p class="help-note">${status === 'queued' || status === 'running' ? '等待后台 worker 写入结果。' : '暂无命中结果。'}</p>`}
+    </div>
+  `);
 }
 
 function parseFastaToMap(text) {

@@ -236,6 +236,83 @@ pre {
   grid-column: 1 / -1;
 }
 
+.blast-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.blast-form {
+  display: grid;
+  grid-template-columns: minmax(150px, 220px) minmax(120px, 180px) 1fr;
+  gap: 14px;
+  align-items: end;
+  margin-top: 18px;
+}
+
+.blast-form label {
+  display: grid;
+  gap: 7px;
+  color: var(--muted);
+  font-weight: 760;
+}
+
+.blast-form select,
+.blast-form input,
+.blast-form textarea {
+  width: 100%;
+  border: 1px solid rgba(61, 99, 70, 0.22);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--ink);
+  font: inherit;
+  padding: 11px 12px;
+  box-sizing: border-box;
+}
+
+.blast-form textarea {
+  min-height: 170px;
+  resize: vertical;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  line-height: 1.45;
+}
+
+.blast-sequence-field {
+  grid-column: 1 / -1;
+}
+
+.blast-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.blast-online-status {
+  margin-top: 16px;
+}
+
+.blast-job-box {
+  border: 1px solid rgba(61, 99, 70, 0.16);
+  border-radius: 8px;
+  padding: 14px;
+  background: rgba(245, 250, 244, 0.75);
+}
+
+.blast-job-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.blast-result-wrap {
+  margin-top: 12px;
+  max-height: 360px;
+}
+
 .eyebrow {
   margin: 0 0 10px;
   text-transform: uppercase;
@@ -923,6 +1000,9 @@ footer {
   .nav { align-items: flex-start; flex-direction: column; }
   .nav-links { gap: 11px; }
   .hero-stats, .module-grid, .detail-grid, .source-grid, .help-grid, .blast-grid, .topic-grid, .browse-grid, .download-grid, .related-list { grid-template-columns: 1fr; }
+  .blast-card-head, .blast-actions { align-items: stretch; flex-direction: column; }
+  .blast-form { grid-template-columns: 1fr; }
+  .blast-actions .button { width: 100%; justify-content: center; }
   .card.full { grid-column: auto; }
   .card dl, .download-card dl { grid-template-columns: 1fr; }
   main { width: min(100% - 22px, 1280px); }
