@@ -24,6 +24,7 @@ function New-SupabaseHeaders {
   param([string]$Prefer)
   $headers = @{
     "apikey" = $ServiceRoleKey
+    "User-Agent" = "KonjacGeneExplorerBlastWorker/1.0"
   }
   if ($ServiceRoleKey -notlike "sb_secret_*") {
     $headers["Authorization"] = "Bearer $ServiceRoleKey"

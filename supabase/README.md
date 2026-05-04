@@ -8,7 +8,7 @@ This project uses Supabase as the online BLAST queue and status API. The website
 
 Submit requests require a Supabase Auth user token. Status requests use `job_id` plus the public job token, so users can refresh their last job without exposing the service role key.
 
-Supabase Edge Functions should not run the BLAST binary directly. Keep BLAST+ on a local machine or server worker, with `SUPABASE_SERVICE_ROLE_KEY` stored only in that worker environment. Never commit the service role key. The worker accepts either the new `sb_secret_...` Secret API Key or the legacy `service_role` JWT.
+Supabase Edge Functions should not run the BLAST binary directly. Keep BLAST+ on a local machine or server worker, with `SUPABASE_SERVICE_ROLE_KEY` stored only in that worker environment. Never commit the service role key. The worker accepts either the new `sb_secret_...` Secret API Key or the legacy `service_role` JWT. For `sb_secret_...`, the worker sends a non-browser User-Agent because Supabase blocks secret keys from browser-like clients.
 
 Worker environment:
 

@@ -41,7 +41,7 @@ The `blast` function requires a logged-in user for submit requests. Status reque
 ## Local BLAST worker
 
 The worker runs on your Windows computer. Keep the service role key only in your local environment.
-Use either the new `sb_secret_...` Secret API Key or the legacy `service_role` JWT. Do not use the publishable key for the worker.
+Use either the new `sb_secret_...` Secret API Key or the legacy `service_role` JWT. Do not use the publishable key for the worker. The worker sets a non-browser User-Agent so Supabase accepts `sb_secret_...` from this local background process.
 
 ```powershell
 Set-Location "D:\桌面图标\wwww. konjac"
