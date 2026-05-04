@@ -17,9 +17,23 @@ const json = (body: unknown, status = 200) =>
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   });
 
+function getBearerToken(req: Request) {
+  const authHeader = req.headers.get('Authorization') || '';
+  return authHeader.replace(/^Bearer\s+/i, '').trim();
+}
+
+async function requireUser(req: Request, supabase: ReturnType<typeof createClient>) {
+  const token = getBearerToken(req);
+  if (!token) throw new Error('Sign in before submitting BLAST.');
+
+  const { data, error } = await supabase.auth.getUser(token);
+  if (error || !data.user) throw new Error('Invalid or expired login session.');
+  return data.user;
+}
+
 function normalizeSequence(raw: unknown, program: BlastProgram) {
   const input = String(raw || '').trim();
-  if (!input) throw new Error('请输入 FASTA 或纯序列。');
+  if (!input) throw new Error('Enter FASTA or plain sequence.');
 
   const lines = input.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
   let queryName = 'query';
@@ -30,16 +44,16 @@ function normalizeSequence(raw: unknown, program: BlastProgram) {
   }
 
   const sequence = sequenceLines.join('').replace(/\s+/g, '').toUpperCase();
-  if (!sequence) throw new Error('查询序列为空。');
-  if (sequence.length > MAX_QUERY_LENGTH) throw new Error(`查询序列不能超过 ${MAX_QUERY_LENGTH} bp/aa。`);
+  if (!sequence) throw new Error('Query sequence is empty.');
+  if (sequence.length > MAX_QUERY_LENGTH) throw new Error(`Query sequence must be <= ${MAX_QUERY_LENGTH} bp/aa.`);
 
   const validNucleotide = /^[ACGTRYSWKMBDHVN.-]+$/i;
   const validProtein = /^[ABCDEFGHIKLMNPQRSTVWXYZ*.-]+$/i;
   if (program === 'blastn' && !validNucleotide.test(sequence)) {
-    throw new Error('blastn 只接受核酸序列字符。');
+    throw new Error('blastn accepts nucleotide characters only.');
   }
   if (program === 'blastp' && !validProtein.test(sequence)) {
-    throw new Error('blastp 只接受蛋白序列字符。');
+    throw new Error('blastp accepts protein characters only.');
   }
 
   const wrapped = sequence.match(/.{1,80}/g)?.join('\n') || sequence;
@@ -71,7 +85,7 @@ Deno.serve(async (req) => {
     if (action === 'status') {
       const jobId = String(body.job_id || '');
       const token = String(body.token || '');
-      if (!jobId || !token) return json({ error: 'job_id 和 token 必填。' }, 400);
+      if (!jobId || !token) return json({ error: 'job_id and token are required.' }, 400);
 
       const { data: job, error: jobError } = await supabase
         .from('blast_jobs')
@@ -80,7 +94,7 @@ Deno.serve(async (req) => {
         .eq('public_token', token)
         .single();
 
-      if (jobError || !job) return json({ error: '未找到 BLAST 任务。' }, 404);
+      if (jobError || !job) return json({ error: 'BLAST job not found.' }, 404);
 
       const { data: hits, error: hitsError } = await supabase
         .from('blast_hits')
@@ -92,8 +106,9 @@ Deno.serve(async (req) => {
       return json({ job, hits: hits || [] });
     }
 
+    const user = await requireUser(req, supabase);
     const program = String(body.program || 'blastn') as BlastProgram;
-    if (!['blastn', 'blastp'].includes(program)) return json({ error: 'program 只能是 blastn 或 blastp。' }, 400);
+    if (!['blastn', 'blastp'].includes(program)) return json({ error: 'program must be blastn or blastp.' }, 400);
 
     const database = PROGRAM_DATABASE[program];
     const maxTargetSeqs = Math.max(1, Math.min(DEFAULT_MAX_TARGETS, Number(body.max_target_seqs) || DEFAULT_MAX_TARGETS));
@@ -104,6 +119,7 @@ Deno.serve(async (req) => {
       .insert({
         program,
         database,
+        user_id: user.id,
         query_name: normalized.queryName,
         query_fasta: normalized.queryFasta,
         query_length: normalized.queryLength,

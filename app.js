@@ -8,6 +8,7 @@ const SUPABASE_URL = 'https://plvylqvdlavriupvphxj.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBsdnlscXZkbGF2cml1cHZwaHhqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc3OTgwMTMsImV4cCI6MjA5MzM3NDAxM30.hvrueYBgtzA9x5ISenK6fI6ofRO9OJ3maelA-D_CjVY';
 const BLAST_FUNCTION_URL = `${SUPABASE_URL}/functions/v1/blast`;
 const BLAST_JOB_STORAGE_KEY = 'konjac_blast_last_job_v1';
+const SUPABASE_AUTH_STORAGE_KEY = 'konjac_supabase_auth_v1';
 
 const VIEW_IDS = ['homeView', 'searchView', 'geneView', 'topicsView', 'browseView', 'downloadsView', 'blastView', 'sourcesView', 'helpView'];
 const SEQUENCE_FILES = {
@@ -80,7 +81,8 @@ const state = {
   overlayIndexPromise: null,
   overlayChunkCache: new Map(),
   overlayChunkPromise: new Map(),
-  blastPollTimer: null
+  blastPollTimer: null,
+  authSession: null
 };
 
 function qs(id) { return $(id.startsWith('#') ? id : `#${id}`); }
@@ -795,13 +797,13 @@ function renderHelpContent() {
     </article>
     <article class="card">
       <h3>BLAST</h3>
-      <p>当前版本提供本地 BLAST+ 和 Supabase 在线队列骨架。</p>
+      <p>当前版本提供 Supabase 登录提交、任务队列和本机 BLAST worker 流程。</p>
       <a class="button ghost small" href="#blast">打开 BLAST</a>
     </article>
     <article class="card full">
       <h3>后续升级</h3>
       <ul class="check-list">
-        <li>在线 BLAST 后端需要服务器、任务超时、序列长度限制和数据库白名单。</li>
+        <li>BLAST 已采用无云服务器队列方案；本机 worker 在线时才会处理任务。</li>
         <li>表达热图需要 expression_tpm.csv 和 sample_metadata.csv。</li>
         <li>“待补充”表示该信息尚未核实，不会自动编造。</li>
       </ul>
@@ -819,10 +821,11 @@ function renderBlastContent() {
       <div class="blast-card-head">
         <div>
           <h3>在线 BLAST 队列</h3>
-          <p class="help-note">提交后由 Supabase 记录任务状态，外部 worker 执行 BLAST 并回写结果。</p>
+          <p class="help-note">提交 BLAST 需要登录；Supabase 记录任务状态，本机 worker 执行 BLAST 并回写结果。</p>
         </div>
-        <span class="status-pill">Supabase</span>
+        <span class="status-pill">Supabase Auth</span>
       </div>
+      <div id="blastAuthPanel" class="blast-auth-panel"></div>
       <form id="blastOnlineForm" class="blast-form">
         <label>
           <span>程序</span>
@@ -852,7 +855,7 @@ function renderBlastContent() {
       <div id="blastManifestStatus" class="blast-status-list">
         <span class="status-pill">正在检查 blastdb/manifest.json...</span>
       </div>
-      <p class="help-note">当前网站仍是纯静态页面；BLAST 在本机 PowerShell 中运行，结果输出到项目目录。</p>
+      <p class="help-note">当前网站仍是静态前端；BLAST 计算由本机 PowerShell worker 完成，任务状态写入 Supabase。</p>
     </article>
     <article class="card blast-card">
       <h3>已准备的软件</h3>
@@ -872,19 +875,19 @@ function renderBlastContent() {
     </article>
     <article class="card blast-card">
       <h3>一键建库</h3>
-      <pre><code>cd D:/konjac-gene-explorer
+      <pre><code>Set-Location "D:\\桌面图标\\wwww. konjac"
 ./scripts/build-blast-db.ps1</code></pre>
       <p>生成 <code>blastdb/konjac_cds</code> 和 <code>blastdb/konjac_pep</code> 两套数据库。</p>
     </article>
     <article class="card blast-card">
       <h3>运行示例查询</h3>
-      <pre><code>cd D:/konjac-gene-explorer
+      <pre><code>Set-Location "D:\\桌面图标\\wwww. konjac"
 ./scripts/run-blast-examples.ps1</code></pre>
       <p>输出 <code>blast_results/example_cds.tsv</code> 和 <code>blast_results/example_pep.tsv</code>。</p>
     </article>
     <article class="card blast-card">
       <h3>启动 Supabase worker</h3>
-      <pre><code>cd D:/konjac-gene-explorer
+      <pre><code>Set-Location "D:\\桌面图标\\wwww. konjac"
 $env:SUPABASE_URL="https://plvylqvdlavriupvphxj.supabase.co"
 $env:SUPABASE_SERVICE_ROLE_KEY="..."
 ./scripts/run-supabase-blast-worker.ps1</code></pre>
@@ -901,10 +904,12 @@ $env:SUPABASE_SERVICE_ROLE_KEY="..."
     <article class="card full blast-card">
       <h3>输出字段</h3>
       <p><code>outfmt 6</code> 字段依次为：query ID、subject ID、identity、alignment length、mismatch、gap open、query start/end、subject start/end、E-value、bitscore。</p>
-      <p class="help-note">在线 BLAST 已接入 Supabase 队列骨架；计算任务仍需要本机或服务器 worker 执行。</p>
+      <p class="help-note">在线提交只负责任务排队和状态查看；本机 worker 没运行时，任务会停留在 queued。</p>
     </article>
   `;
   bindBlastOnlineForm();
+  bindBlastAuthPanel();
+  void hydrateBlastAuthPanel();
   void restoreLastBlastJob();
   void hydrateBlastManifest();
 }
@@ -944,6 +949,177 @@ function updateBlastDatabaseHint() {
   const program = qs('blastProgram')?.value || 'blastn';
   const hint = qs('blastDatabaseHint');
   if (hint) hint.textContent = `数据库：${blastDatabaseForProgram(program)}`;
+}
+
+function readAuthSession() {
+  if (state.authSession) return state.authSession;
+  try {
+    const raw = localStorage.getItem(SUPABASE_AUTH_STORAGE_KEY);
+    state.authSession = raw ? JSON.parse(raw) : null;
+    return state.authSession;
+  } catch (error) {
+    return null;
+  }
+}
+
+function saveAuthSession(session) {
+  state.authSession = session || null;
+  try {
+    if (session) localStorage.setItem(SUPABASE_AUTH_STORAGE_KEY, JSON.stringify(session));
+    else localStorage.removeItem(SUPABASE_AUTH_STORAGE_KEY);
+  } catch (error) {
+    // The in-memory session still works for the current page.
+  }
+}
+
+function normalizeAuthSession(data) {
+  if (!data?.access_token) return null;
+  const expiresIn = Number(data.expires_in) || 3600;
+  return {
+    access_token: data.access_token,
+    refresh_token: data.refresh_token || '',
+    expires_at: Date.now() + Math.max(60, expiresIn - 60) * 1000,
+    user: data.user || null
+  };
+}
+
+async function supabaseAuthRequest(path, body = null, accessToken = '') {
+  const headers = {
+    apikey: SUPABASE_ANON_KEY,
+    'Content-Type': 'application/json'
+  };
+  if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
+  const options = { method: 'POST', headers };
+  if (body !== null) options.body = JSON.stringify(body);
+  const res = await fetch(`${SUPABASE_URL}/auth/v1/${path}`, options);
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.error_description || data.msg || data.message || data.error || `Supabase Auth HTTP ${res.status}`);
+  }
+  return data;
+}
+
+async function ensureAuthSession() {
+  const session = readAuthSession();
+  if (!session?.access_token) return null;
+  if (!session.expires_at || Date.now() < Number(session.expires_at)) return session;
+  if (!session.refresh_token) {
+    saveAuthSession(null);
+    return null;
+  }
+  try {
+    const data = await supabaseAuthRequest('token?grant_type=refresh_token', {
+      refresh_token: session.refresh_token
+    });
+    const refreshed = normalizeAuthSession(data);
+    saveAuthSession(refreshed);
+    return refreshed;
+  } catch (error) {
+    saveAuthSession(null);
+    return null;
+  }
+}
+
+function bindBlastAuthPanel() {
+  const host = qs('blastAuthPanel');
+  if (!host || host.dataset.bound === 'true') return;
+  host.dataset.bound = 'true';
+  host.addEventListener('click', (event) => {
+    const target = event.target instanceof Element ? event.target.closest('[data-auth-action]') : null;
+    const action = target?.dataset.authAction;
+    if (!action) return;
+    if (action === 'logout') {
+      void logoutBlastUser();
+    } else if (action === 'login' || action === 'signup') {
+      void submitBlastAuth(action);
+    }
+  });
+  host.addEventListener('keydown', (event) => {
+    if (event.key !== 'Enter') return;
+    const target = event.target instanceof Element ? event.target : null;
+    if (!target?.matches('input')) return;
+    event.preventDefault();
+    void submitBlastAuth('login');
+  });
+}
+
+async function hydrateBlastAuthPanel(message = '') {
+  const host = qs('blastAuthPanel');
+  if (!host) return;
+  const session = await ensureAuthSession();
+  const messageHtml = message ? `<p class="blast-auth-message">${escapeHtml(message)}</p>` : '';
+  if (session?.access_token) {
+    const email = session.user?.email || 'Supabase user';
+    host.innerHTML = `
+      <div class="blast-auth-box signed-in">
+        <div>
+          <strong>已登录</strong>
+          <span>${escapeHtml(email)}</span>
+          <small>只有提交 BLAST 需要登录；状态刷新使用任务 token。</small>
+        </div>
+        <div class="blast-auth-actions">
+          <button class="button ghost small" type="button" data-auth-action="logout">退出登录</button>
+        </div>
+      </div>
+      ${messageHtml}
+    `;
+    return;
+  }
+  host.innerHTML = `
+    <div class="blast-auth-box">
+      <div>
+        <strong>登录后提交 BLAST</strong>
+        <small>搜索、详情、JBrowse 和下载页面保持公开。</small>
+      </div>
+      <label>
+        <span>邮箱</span>
+        <input id="blastAuthEmail" type="email" autocomplete="email" placeholder="you@example.com">
+      </label>
+      <label>
+        <span>密码</span>
+        <input id="blastAuthPassword" type="password" autocomplete="current-password" placeholder="至少 6 位">
+      </label>
+      <div class="blast-auth-actions">
+        <button class="button small" type="button" data-auth-action="login">登录</button>
+        <button class="button ghost small" type="button" data-auth-action="signup">注册</button>
+      </div>
+    </div>
+    ${messageHtml}
+  `;
+}
+
+async function submitBlastAuth(action) {
+  const email = qs('blastAuthEmail')?.value?.trim();
+  const password = qs('blastAuthPassword')?.value || '';
+  if (!email || !password) {
+    await hydrateBlastAuthPanel('请输入邮箱和密码。');
+    return;
+  }
+  try {
+    await hydrateBlastAuthPanel(action === 'signup' ? '正在注册账号...' : '正在登录...');
+    const path = action === 'signup' ? 'signup' : 'token?grant_type=password';
+    const data = await supabaseAuthRequest(path, { email, password });
+    const session = normalizeAuthSession(data);
+    if (session) {
+      saveAuthSession(session);
+      await hydrateBlastAuthPanel(action === 'signup' ? '注册并登录成功。' : '登录成功，可以提交 BLAST。');
+    } else {
+      await hydrateBlastAuthPanel('注册成功。若 Supabase 开启了邮箱确认，请先查收邮件确认账号后再登录。');
+    }
+  } catch (error) {
+    await hydrateBlastAuthPanel(error.message || '登录失败，请稍后重试。');
+  }
+}
+
+async function logoutBlastUser() {
+  const session = readAuthSession();
+  try {
+    if (session?.access_token) await supabaseAuthRequest('logout', null, session.access_token);
+  } catch (error) {
+    // A stale token can fail logout remotely; clearing local state is still correct.
+  }
+  saveAuthSession(null);
+  await hydrateBlastAuthPanel('已退出登录。');
 }
 
 function bindBlastOnlineForm() {
@@ -1019,13 +1195,19 @@ async function submitOnlineBlast(event) {
   const maxTargetSeqs = Number(qs('blastMaxTargets')?.value || 50);
   try {
     const queryLength = validateBlastSequenceInput(sequence, program);
+    const session = await ensureAuthSession();
+    if (!session?.access_token) {
+      await hydrateBlastAuthPanel('请先登录后再提交 BLAST。');
+      renderBlastOnlineStatus('<p class="download-warning">BLAST 提交需要 Supabase 登录；其他页面仍可直接浏览。</p>');
+      return;
+    }
     renderBlastOnlineStatus(`<p class="help-note">正在提交 ${escapeHtml(program)} 查询，长度 ${formatNumber(queryLength)}...</p>`);
     const res = await fetch(BLAST_FUNCTION_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         apikey: SUPABASE_ANON_KEY,
-        Authorization: `Bearer ${SUPABASE_ANON_KEY}`
+        Authorization: `Bearer ${session.access_token}`
       },
       body: JSON.stringify({
         action: 'submit',
@@ -1049,12 +1231,13 @@ async function fetchBlastJob(record, showLoading = true) {
   if (!record?.job_id || !record?.token) return;
   try {
     if (showLoading) renderBlastOnlineStatus('<p class="help-note">正在刷新 BLAST 任务状态...</p>');
+    const session = await ensureAuthSession();
     const res = await fetch(BLAST_FUNCTION_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         apikey: SUPABASE_ANON_KEY,
-        Authorization: `Bearer ${SUPABASE_ANON_KEY}`
+        Authorization: `Bearer ${session?.access_token || SUPABASE_ANON_KEY}`
       },
       body: JSON.stringify({
         action: 'status',

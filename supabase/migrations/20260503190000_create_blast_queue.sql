@@ -9,6 +9,7 @@ create table public.blast_jobs (
   public_token text not null default encode(gen_random_bytes(16), 'hex'),
   program public.blast_program not null,
   database public.blast_database not null,
+  user_id uuid references auth.users(id) on delete set null,
   query_name text,
   query_fasta text not null,
   query_length integer not null check (query_length > 0 and query_length <= 20000),
@@ -49,6 +50,7 @@ create table public.blast_hits (
 );
 
 create index blast_jobs_status_created_idx on public.blast_jobs (status, created_at);
+create index blast_jobs_user_created_idx on public.blast_jobs (user_id, created_at desc);
 create index blast_jobs_public_lookup_idx on public.blast_jobs (id, public_token);
 create index blast_hits_job_rank_idx on public.blast_hits (job_id, rank);
 

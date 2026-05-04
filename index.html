@@ -217,8 +217,8 @@
     <section class="panel view-shell" id="blastView" data-view="blast" hidden>
       <div class="section-heading">
         <p class="eyebrow">BLAST</p>
-        <h2>本地 BLAST 使用说明</h2>
-        <p>当前静态版本提供本地 BLAST+ 流程说明。在线 BLAST 需要后端服务器、任务队列和运行限制，后续单独部署。</p>
+        <h2>BLAST 队列与本地 worker</h2>
+        <p>BLAST 提交使用 Supabase 登录和任务队列；实际计算由本机 worker 运行 BLAST+ 后写回结果。</p>
       </div>
       <div id="blastContent" class="blast-grid"></div>
     </section>
@@ -261,7 +261,7 @@
           </ul>
         </article>
       </div>
-      <p class="notice">说明：本网站是静态数据浏览器，已接入 JBrowse 静态基因组浏览器；在线 BLAST、表达矩阵和共表达网络可在后续版本继续加入。</p>
+      <p class="notice">说明：本网站是静态数据浏览器，已接入 JBrowse 静态基因组浏览器；BLAST 使用 Supabase 队列和本机 worker，表达矩阵和共表达网络可在后续版本继续加入。</p>
     </section>
 
     <section class="panel view-shell" id="helpView" data-view="help" hidden>
@@ -292,7 +292,7 @@
           <ul>
             <li>当前页面是纯静态站，搜索结果和详情都来自本地数据文件。</li>
             <li>如果 URL 中带有 <code>#search?q=...</code> 或 <code>#gene/...</code>，刷新后会恢复到对应视图。</li>
-            <li>JBrowse 已接入静态基因组浏览器；在线 BLAST 和表达模块后续需要额外服务或数据。</li>
+            <li>JBrowse 已接入静态基因组浏览器；BLAST 使用 Supabase 队列和本机 worker，表达模块后续需要额外数据。</li>
           </ul>
         </article>
       </div>
