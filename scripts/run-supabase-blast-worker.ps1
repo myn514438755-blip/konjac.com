@@ -24,7 +24,9 @@ function New-SupabaseHeaders {
   param([string]$Prefer)
   $headers = @{
     "apikey" = $ServiceRoleKey
-    "Authorization" = "Bearer $ServiceRoleKey"
+  }
+  if ($ServiceRoleKey -notlike "sb_secret_*") {
+    $headers["Authorization"] = "Bearer $ServiceRoleKey"
   }
   if ($Prefer) { $headers["Prefer"] = $Prefer }
   return $headers
