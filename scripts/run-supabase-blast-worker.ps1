@@ -20,6 +20,11 @@ if (-not (Test-Path $BlastBin)) { throw "BLAST+ bin directory not found: $BlastB
 
 New-Item -ItemType Directory -Force -Path $WorkRoot | Out-Null
 
+Write-Host "Konjac BLAST worker started."
+Write-Host "Supabase: $SupabaseUrl"
+Write-Host "Worker ID: $WorkerId"
+Write-Host "Polling every $PollSeconds seconds. Press Ctrl+C to stop."
+
 function New-SupabaseHeaders {
   param([string]$Prefer)
   $headers = @{
@@ -154,10 +159,12 @@ function Run-Job {
 do {
   $job = Get-NextQueuedJob
   if ($null -ne $job) {
+    Write-Host "Claiming BLAST job $($job.id) ($($job.program), $($job.database))..."
     Run-Job -Job $job
   } elseif ($Once) {
     Write-Host "No queued BLAST jobs."
   } else {
+    Write-Host "$(Get-Date -Format 'HH:mm:ss') No queued BLAST jobs. Waiting..."
     Start-Sleep -Seconds $PollSeconds
   }
 } while (-not $Once)
