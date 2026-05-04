@@ -121,18 +121,26 @@ function Run-Job {
 
     if ($claimed.program -eq "blastn") {
       $exe = Join-Path $BlastBin "blastn.exe"
-      $db = Join-Path $BlastDbRoot "konjac_cds"
+      $db = "blastdb\konjac_cds"
     } elseif ($claimed.program -eq "blastp") {
       $exe = Join-Path $BlastBin "blastp.exe"
-      $db = Join-Path $BlastDbRoot "konjac_pep"
+      $db = "blastdb\konjac_pep"
     } else {
       throw "Unsupported program: $($claimed.program)"
     }
 
     if (-not (Test-Path $exe)) { throw "BLAST executable not found: $exe" }
+    if (-not (Test-Path (Join-Path $ProjectRoot "$db.nhr")) -and -not (Test-Path (Join-Path $ProjectRoot "$db.phr"))) {
+      throw "BLAST database files not found for $db"
+    }
 
-    & $exe -query $queryPath -db $db -out $outPath -outfmt $Outfmt -max_target_seqs ([int]$claimed.max_target_seqs)
-    if ($LASTEXITCODE -ne 0) { throw "BLAST exited with code $LASTEXITCODE" }
+    Push-Location $ProjectRoot
+    try {
+      & $exe -query $queryPath -db $db -out $outPath -outfmt $Outfmt -max_target_seqs ([int]$claimed.max_target_seqs)
+      if ($LASTEXITCODE -ne 0) { throw "BLAST exited with code $LASTEXITCODE" }
+    } finally {
+      Pop-Location
+    }
 
     $hits = Parse-BlastTsv -Path $outPath -JobId $jobId
     if ($hits.Count -gt 0) {
