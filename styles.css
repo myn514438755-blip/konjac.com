@@ -375,6 +375,12 @@ pre {
   max-height: 360px;
 }
 
+.blast-subject-link {
+  display: inline-block;
+  max-width: min(560px, 68vw);
+  overflow-wrap: anywhere;
+}
+
 .eyebrow {
   margin: 0 0 10px;
   text-transform: uppercase;

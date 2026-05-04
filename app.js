@@ -1279,6 +1279,12 @@ function stopBlastPolling() {
   }
 }
 
+function renderBlastSubjectLink(subjectId) {
+  const id = String(subjectId || '').trim();
+  if (!id) return '<span class="muted">-</span>';
+  return `<a class="gene-link blast-subject-link" href="#gene/${encodeURIComponent(id)}">${escapeHtml(id)}</a>`;
+}
+
 function renderBlastJobResult(data) {
   const job = data.job || {};
   const hits = Array.isArray(data.hits) ? data.hits : [];
@@ -1288,7 +1294,7 @@ function renderBlastJobResult(data) {
   const rows = hits.map(hit => `
     <tr>
       <td data-label="#">${escapeHtml(hit.rank)}</td>
-      <td data-label="Subject">${escapeHtml(hit.sseqid)}</td>
+      <td data-label="Subject">${renderBlastSubjectLink(hit.sseqid)}</td>
       <td data-label="Identity">${escapeHtml(hit.pident)}</td>
       <td data-label="Length">${escapeHtml(hit.alignment_length)}</td>
       <td data-label="E-value">${escapeHtml(hit.evalue)}</td>
