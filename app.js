@@ -999,6 +999,15 @@ async function supabaseAuthRequest(path, body = null, accessToken = '') {
   return data;
 }
 
+function friendlyAuthError(error) {
+  const message = error?.message ? String(error.message) : '';
+  if (/invalid login credentials/i.test(message)) return '邮箱或密码不正确。如果还没有账号，请先输入邮箱和密码后点击注册。';
+  if (/signup|signups.*disabled|not allowed/i.test(message)) return '当前 Supabase 项目未允许邮箱注册，请先在 Supabase Auth 设置里启用 Email/Password 注册。';
+  if (/password/i.test(message) && /six|6|weak|short/i.test(message)) return '密码太短，请使用至少 6 位密码。';
+  if (/email/i.test(message) && /invalid/i.test(message)) return '邮箱格式不正确。';
+  return message || 'Supabase Auth 请求失败，请稍后重试。';
+}
+
 async function ensureAuthSession() {
   const session = readAuthSession();
   if (!session?.access_token) return null;
@@ -1069,7 +1078,7 @@ async function hydrateBlastAuthPanel(message = '') {
     <div class="blast-auth-box">
       <div>
         <strong>登录后提交 BLAST</strong>
-        <small>搜索、详情、JBrowse 和下载页面保持公开。</small>
+        <small>先输入真实邮箱和至少 6 位密码。没有账号就点注册；搜索、详情、JBrowse 和下载页面保持公开。</small>
       </div>
       <label>
         <span>邮箱</span>
@@ -1092,7 +1101,7 @@ async function submitBlastAuth(action) {
   const email = qs('blastAuthEmail')?.value?.trim();
   const password = qs('blastAuthPassword')?.value || '';
   if (!email || !password) {
-    await hydrateBlastAuthPanel('请输入邮箱和密码。');
+    await hydrateBlastAuthPanel('请输入真实邮箱和至少 6 位密码，然后再登录或注册。');
     return;
   }
   try {
@@ -1107,7 +1116,7 @@ async function submitBlastAuth(action) {
       await hydrateBlastAuthPanel('注册成功。若 Supabase 开启了邮箱确认，请先查收邮件确认账号后再登录。');
     }
   } catch (error) {
-    await hydrateBlastAuthPanel(error.message || '登录失败，请稍后重试。');
+    await hydrateBlastAuthPanel(friendlyAuthError(error));
   }
 }
 
