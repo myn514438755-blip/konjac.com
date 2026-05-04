@@ -1,6 +1,6 @@
 {
     "schema":  "konjac.blast_manifest.v1",
-    "built_at":  "2026-05-03T08:11:14.5621273Z",
+    "built_at":  "2026-05-04T14:50:29.9084760Z",
     "blast_version":  "blastn: 2.9.0+",
     "tools":  {
                   "makeblastdb":  "C:\\Program Files\\NCBI\\blast-2.9.0+\\bin\\makeblastdb.exe",
@@ -9,7 +9,8 @@
               },
     "inputs":  {
                    "cds":  "downloads/Amorphophallus_konjac.clean.cds",
-                   "protein":  "downloads/Amorphophallus_konjac.clean.pep"
+                   "protein":  "downloads/Amorphophallus_konjac.clean.pep",
+                   "genome":  "data/processed/jbrowse-app/assemblies/GCA_022559845.1_ASM2255984v1_genomic.fna.bgz"
                },
     "databases":  [
                       {
@@ -49,6 +50,42 @@
                                         {
                                             "name":  "konjac_pep.psq",
                                             "bytes":  16211243
+                                        }
+                                    ]
+                      },
+                      {
+                          "id":  "konjac_genome",
+                          "label":  "Konjac genome nucleotide database",
+                          "dbtype":  "nucl",
+                          "prefix":  "blastdb/konjac_genome",
+                          "files":  [
+                                        {
+                                            "name":  "konjac_genome.00.nhr",
+                                            "bytes":  1521
+                                        },
+                                        {
+                                            "name":  "konjac_genome.00.nin",
+                                            "bytes":  204
+                                        },
+                                        {
+                                            "name":  "konjac_genome.00.nsq",
+                                            "bytes":  949368203
+                                        },
+                                        {
+                                            "name":  "konjac_genome.01.nhr",
+                                            "bytes":  581656
+                                        },
+                                        {
+                                            "name":  "konjac_genome.01.nin",
+                                            "bytes":  44124
+                                        },
+                                        {
+                                            "name":  "konjac_genome.01.nsq",
+                                            "bytes":  450311007
+                                        },
+                                        {
+                                            "name":  "konjac_genome.nal",
+                                            "bytes":  129
                                         }
                                     ]
                       }

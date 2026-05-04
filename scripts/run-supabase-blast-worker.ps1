@@ -119,18 +119,25 @@ function Run-Job {
   try {
     [System.IO.File]::WriteAllText($queryPath, [string]$claimed.query_fasta, [System.Text.Encoding]::ASCII)
 
-    if ($claimed.program -eq "blastn") {
+    if ($claimed.program -eq "blastn" -and $claimed.database -eq "konjac_cds") {
       $exe = Join-Path $BlastBin "blastn.exe"
       $db = "blastdb\konjac_cds"
+    } elseif ($claimed.program -eq "blastn" -and $claimed.database -eq "konjac_genome") {
+      $exe = Join-Path $BlastBin "blastn.exe"
+      $db = "blastdb\konjac_genome"
     } elseif ($claimed.program -eq "blastp") {
       $exe = Join-Path $BlastBin "blastp.exe"
       $db = "blastdb\konjac_pep"
     } else {
-      throw "Unsupported program: $($claimed.program)"
+      throw "Unsupported BLAST job: program=$($claimed.program), database=$($claimed.database)"
     }
 
     if (-not (Test-Path $exe)) { throw "BLAST executable not found: $exe" }
-    if (-not (Test-Path (Join-Path $ProjectRoot "$db.nhr")) -and -not (Test-Path (Join-Path $ProjectRoot "$db.phr"))) {
+    $dbExists = (Test-Path (Join-Path $ProjectRoot "$db.nhr")) -or
+      (Test-Path (Join-Path $ProjectRoot "$db.phr")) -or
+      (Test-Path (Join-Path $ProjectRoot "$db.nal")) -or
+      (Test-Path (Join-Path $ProjectRoot "$db.pal"))
+    if (-not $dbExists) {
       throw "BLAST database files not found for $db"
     }
 

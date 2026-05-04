@@ -828,10 +828,11 @@ function renderBlastContent() {
       <div id="blastAuthPanel" class="blast-auth-panel"></div>
       <form id="blastOnlineForm" class="blast-form">
         <label>
-          <span>程序</span>
+          <span>搜索库</span>
           <select id="blastProgram">
-            <option value="blastn">blastn against CDS</option>
-            <option value="blastp">blastp against protein</option>
+            <option value="konjac_cds" data-program="blastn">blastn against CDS</option>
+            <option value="konjac_pep" data-program="blastp">blastp against protein</option>
+            <option value="konjac_genome" data-program="blastn">blastn against genome</option>
           </select>
         </label>
         <label>
@@ -875,19 +876,19 @@ function renderBlastContent() {
     </article>
     <article class="card blast-card">
       <h3>一键建库</h3>
-      <pre><code>Set-Location "D:\\桌面图标\\wwww. konjac"
+      <pre><code>Set-Location "&lt;project-root&gt;"
 ./scripts/build-blast-db.ps1</code></pre>
-      <p>生成 <code>blastdb/konjac_cds</code> 和 <code>blastdb/konjac_pep</code> 两套数据库。</p>
+      <p>默认生成 <code>konjac_cds</code> 和 <code>konjac_pep</code>；需要 genome 时运行 <code>./scripts/build-blast-db.ps1 -IncludeGenome</code>。</p>
     </article>
     <article class="card blast-card">
       <h3>运行示例查询</h3>
-      <pre><code>Set-Location "D:\\桌面图标\\wwww. konjac"
+      <pre><code>Set-Location "&lt;project-root&gt;"
 ./scripts/run-blast-examples.ps1</code></pre>
       <p>输出 <code>blast_results/example_cds.tsv</code> 和 <code>blast_results/example_pep.tsv</code>。</p>
     </article>
     <article class="card blast-card">
       <h3>启动 Supabase worker</h3>
-      <pre><code>Set-Location "D:\\桌面图标\\wwww. konjac"
+      <pre><code>Set-Location "&lt;project-root&gt;"
 $env:SUPABASE_URL="https://plvylqvdlavriupvphxj.supabase.co"
 $env:SUPABASE_SERVICE_ROLE_KEY="..."
 ./scripts/run-supabase-blast-worker.ps1</code></pre>
@@ -896,6 +897,10 @@ $env:SUPABASE_SERVICE_ROLE_KEY="..."
     <article class="card blast-card">
       <h3>手动 blastn</h3>
       <pre><code>blastn -query examples/blast/query_cds.fa -db blastdb/konjac_cds -out blast_results/my_cds.tsv -outfmt "6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore" -max_target_seqs 50</code></pre>
+    </article>
+    <article class="card blast-card">
+      <h3>手动 genome blastn</h3>
+      <pre><code>blastn -query examples/blast/query_cds.fa -db blastdb/konjac_genome -out blast_results/my_genome.tsv -outfmt "6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore" -max_target_seqs 25</code></pre>
     </article>
     <article class="card blast-card">
       <h3>手动 blastp</h3>
@@ -941,14 +946,29 @@ async function hydrateBlastManifest() {
   }
 }
 
-function blastDatabaseForProgram(program) {
-  return program === 'blastp' ? 'konjac_pep' : 'konjac_cds';
+function getBlastSelection() {
+  const select = qs('blastProgram');
+  const option = select?.selectedOptions?.[0];
+  const database = select?.value || 'konjac_cds';
+  const program = option?.dataset?.program || (database === 'konjac_pep' ? 'blastp' : 'blastn');
+  return { program, database };
 }
 
 function updateBlastDatabaseHint() {
-  const program = qs('blastProgram')?.value || 'blastn';
+  const { database } = getBlastSelection();
   const hint = qs('blastDatabaseHint');
-  if (hint) hint.textContent = `数据库：${blastDatabaseForProgram(program)}`;
+  if (hint) hint.textContent = `数据库：${database}`;
+  const maxTargets = qs('blastMaxTargets');
+  if (maxTargets) {
+    maxTargets.max = database === 'konjac_genome' ? '25' : '50';
+    if (Number(maxTargets.value || 50) > Number(maxTargets.max)) maxTargets.value = maxTargets.max;
+  }
+  const sequence = qs('blastSequence');
+  if (sequence) {
+    sequence.placeholder = database === 'konjac_genome'
+      ? '>query\nATGG...（genome blastn 建议 <= 10,000 bp）'
+      : '>query\nATGG...';
+  }
 }
 
 function readAuthSession() {
@@ -1173,14 +1193,15 @@ async function restoreLastBlastJob() {
   await fetchBlastJob(record, false);
 }
 
-function validateBlastSequenceInput(value, program) {
+function validateBlastSequenceInput(value, program, database = '') {
   const input = String(value || '').trim();
   if (!input) throw new Error('请输入 FASTA 或纯序列。');
   const lines = input.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
   const sequenceLines = lines[0]?.startsWith('>') ? lines.slice(1) : lines;
   const sequence = sequenceLines.join('').replace(/\s+/g, '').toUpperCase();
   if (!sequence) throw new Error('查询序列为空。');
-  if (sequence.length > 20000) throw new Error('查询序列不能超过 20,000 bp/aa。');
+  const maxLength = database === 'konjac_genome' ? 10000 : 20000;
+  if (sequence.length > maxLength) throw new Error(`查询序列不能超过 ${formatNumber(maxLength)} bp/aa。`);
   const validNucleotide = /^[ACGTRYSWKMBDHVN.-]+$/i;
   const validProtein = /^[ABCDEFGHIKLMNPQRSTVWXYZ*.-]+$/i;
   if (program === 'blastn' && !validNucleotide.test(sequence)) {
@@ -1199,18 +1220,19 @@ function renderBlastOnlineStatus(html) {
 
 async function submitOnlineBlast(event) {
   event.preventDefault();
-  const program = qs('blastProgram')?.value || 'blastn';
+  const { program, database } = getBlastSelection();
   const sequence = qs('blastSequence')?.value || '';
-  const maxTargetSeqs = Number(qs('blastMaxTargets')?.value || 50);
+  const maxTargetLimit = database === 'konjac_genome' ? 25 : 50;
+  const maxTargetSeqs = Math.max(1, Math.min(maxTargetLimit, Number(qs('blastMaxTargets')?.value || maxTargetLimit)));
   try {
-    const queryLength = validateBlastSequenceInput(sequence, program);
+    const queryLength = validateBlastSequenceInput(sequence, program, database);
     const session = await ensureAuthSession();
     if (!session?.access_token) {
       await hydrateBlastAuthPanel('请先登录后再提交 BLAST。');
       renderBlastOnlineStatus('<p class="download-warning">BLAST 提交需要 Supabase 登录；其他页面仍可直接浏览。</p>');
       return;
     }
-    renderBlastOnlineStatus(`<p class="help-note">正在提交 ${escapeHtml(program)} 查询，长度 ${formatNumber(queryLength)}...</p>`);
+    renderBlastOnlineStatus(`<p class="help-note">正在提交 ${escapeHtml(program)} / ${escapeHtml(database)} 查询，长度 ${formatNumber(queryLength)}...</p>`);
     const res = await fetch(BLAST_FUNCTION_URL, {
       method: 'POST',
       headers: {
@@ -1221,6 +1243,7 @@ async function submitOnlineBlast(event) {
       body: JSON.stringify({
         action: 'submit',
         program,
+        database,
         sequence,
         max_target_seqs: maxTargetSeqs
       })
@@ -1279,9 +1302,20 @@ function stopBlastPolling() {
   }
 }
 
-function renderBlastSubjectLink(subjectId) {
+function renderBlastSubjectLink(hit, database = '') {
+  const subjectId = hit?.sseqid;
   const id = String(subjectId || '').trim();
   if (!id) return '<span class="muted">-</span>';
+  if (database === 'konjac_genome') {
+    const start = Number(hit?.sstart);
+    const end = Number(hit?.send);
+    if (Number.isFinite(start) && Number.isFinite(end) && start > 0 && end > 0) {
+      const from = Math.max(1, Math.min(start, end) - 2000);
+      const to = Math.max(start, end) + 2000;
+      const loc = `${id}:${from}..${to}`;
+      return `<a class="gene-link blast-subject-link" href="./data/processed/jbrowse-app/index.html?config=./config.json&loc=${encodeURIComponent(loc)}" target="_blank" rel="noopener">${escapeHtml(id)}:${formatNumber(Math.min(start, end))}-${formatNumber(Math.max(start, end))}</a>`;
+    }
+  }
   return `<a class="gene-link blast-subject-link" href="#gene/${encodeURIComponent(id)}">${escapeHtml(id)}</a>`;
 }
 
@@ -1294,7 +1328,7 @@ function renderBlastJobResult(data) {
   const rows = hits.map(hit => `
     <tr>
       <td data-label="#">${escapeHtml(hit.rank)}</td>
-      <td data-label="Subject">${renderBlastSubjectLink(hit.sseqid)}</td>
+      <td data-label="Subject">${renderBlastSubjectLink(hit, job.database)}</td>
       <td data-label="Identity">${escapeHtml(hit.pident)}</td>
       <td data-label="Length">${escapeHtml(hit.alignment_length)}</td>
       <td data-label="E-value">${escapeHtml(hit.evalue)}</td>

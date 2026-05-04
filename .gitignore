@@ -23,6 +23,8 @@ Thumbs.db
 
 # Local BLAST runtime output can be regenerated
 /blast_results/
+/blastdb/konjac_genome.*
+/blastdb/konjac_genome_source.fna
 
 # Codex export git database
 .gitdata/

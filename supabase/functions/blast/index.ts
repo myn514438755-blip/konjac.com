@@ -2,11 +2,17 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { corsHeaders } from '../_shared/cors.ts';
 
 type BlastProgram = 'blastn' | 'blastp';
-type BlastDatabase = 'konjac_cds' | 'konjac_pep';
+type BlastDatabase = 'konjac_cds' | 'konjac_pep' | 'konjac_genome';
 
 const MAX_QUERY_LENGTH = 20000;
+const MAX_GENOME_QUERY_LENGTH = 10000;
 const DEFAULT_MAX_TARGETS = 50;
-const PROGRAM_DATABASE: Record<BlastProgram, BlastDatabase> = {
+const DEFAULT_GENOME_MAX_TARGETS = 25;
+const PROGRAM_DATABASES: Record<BlastProgram, BlastDatabase[]> = {
+  blastn: ['konjac_cds', 'konjac_genome'],
+  blastp: ['konjac_pep'],
+};
+const DEFAULT_DATABASE: Record<BlastProgram, BlastDatabase> = {
   blastn: 'konjac_cds',
   blastp: 'konjac_pep',
 };
@@ -31,7 +37,7 @@ async function requireUser(req: Request, supabase: ReturnType<typeof createClien
   return data.user;
 }
 
-function normalizeSequence(raw: unknown, program: BlastProgram) {
+function normalizeSequence(raw: unknown, program: BlastProgram, maxLength = MAX_QUERY_LENGTH) {
   const input = String(raw || '').trim();
   if (!input) throw new Error('Enter FASTA or plain sequence.');
 
@@ -45,7 +51,7 @@ function normalizeSequence(raw: unknown, program: BlastProgram) {
 
   const sequence = sequenceLines.join('').replace(/\s+/g, '').toUpperCase();
   if (!sequence) throw new Error('Query sequence is empty.');
-  if (sequence.length > MAX_QUERY_LENGTH) throw new Error(`Query sequence must be <= ${MAX_QUERY_LENGTH} bp/aa.`);
+  if (sequence.length > maxLength) throw new Error(`Query sequence must be <= ${maxLength} bp/aa.`);
 
   const validNucleotide = /^[ACGTRYSWKMBDHVN.-]+$/i;
   const validProtein = /^[ABCDEFGHIKLMNPQRSTVWXYZ*.-]+$/i;
@@ -110,9 +116,16 @@ Deno.serve(async (req) => {
     const program = String(body.program || 'blastn') as BlastProgram;
     if (!['blastn', 'blastp'].includes(program)) return json({ error: 'program must be blastn or blastp.' }, 400);
 
-    const database = PROGRAM_DATABASE[program];
-    const maxTargetSeqs = Math.max(1, Math.min(DEFAULT_MAX_TARGETS, Number(body.max_target_seqs) || DEFAULT_MAX_TARGETS));
-    const normalized = normalizeSequence(body.sequence, program);
+    const requestedDatabase = String(body.database || DEFAULT_DATABASE[program]) as BlastDatabase;
+    if (!PROGRAM_DATABASES[program].includes(requestedDatabase)) {
+      return json({ error: 'database is not valid for selected BLAST program.' }, 400);
+    }
+
+    const database = requestedDatabase;
+    const maxTargetsLimit = database === 'konjac_genome' ? DEFAULT_GENOME_MAX_TARGETS : DEFAULT_MAX_TARGETS;
+    const queryLengthLimit = database === 'konjac_genome' ? MAX_GENOME_QUERY_LENGTH : MAX_QUERY_LENGTH;
+    const maxTargetSeqs = Math.max(1, Math.min(maxTargetsLimit, Number(body.max_target_seqs) || maxTargetsLimit));
+    const normalized = normalizeSequence(body.sequence, program, queryLengthLimit);
 
     const { data, error } = await supabase
       .from('blast_jobs')

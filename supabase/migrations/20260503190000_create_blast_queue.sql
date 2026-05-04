@@ -2,7 +2,7 @@ create extension if not exists pgcrypto;
 
 create type public.blast_job_status as enum ('queued', 'running', 'succeeded', 'failed', 'cancelled');
 create type public.blast_program as enum ('blastn', 'blastp');
-create type public.blast_database as enum ('konjac_cds', 'konjac_pep');
+create type public.blast_database as enum ('konjac_cds', 'konjac_pep', 'konjac_genome');
 
 create table public.blast_jobs (
   id uuid primary key default gen_random_uuid(),
@@ -25,6 +25,7 @@ create table public.blast_jobs (
   user_agent text,
   constraint blast_program_database_match check (
     (program = 'blastn' and database = 'konjac_cds') or
+    (program = 'blastn' and database = 'konjac_genome') or
     (program = 'blastp' and database = 'konjac_pep')
   )
 );
