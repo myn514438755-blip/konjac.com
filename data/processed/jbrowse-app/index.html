@@ -1,1 +1,114 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"/><link rel="shortcut icon" href="favicon.ico"/><meta name="viewport" content="width=device-width,initial-scale=1"/><meta name="theme-color" content="#000000"/><meta name="description" content="A fast and flexible genome browser"/><link rel="manifest" href="manifest.json"/><title>JBrowse</title><style>*{overscroll-behavior-x:none}</style><script defer="defer" src="static/js/main.d3da3f70.js"></script></head><body><noscript>You need to enable JavaScript to run this app.</noscript><div id="root"></div></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <link rel="shortcut icon" href="favicon.ico">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#000000">
+  <meta name="description" content="Konjac Gene Explorer genome browser">
+  <link rel="manifest" href="manifest.json">
+  <title>Konjac Genome Browser</title>
+  <style>
+    * { box-sizing: border-box; overscroll-behavior-x: none; }
+    body {
+      margin: 0;
+      font-family: Inter, "Segoe UI", Arial, sans-serif;
+      color: #172318;
+      background: #f4f8f1;
+    }
+    .online-note {
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 32px 18px;
+    }
+    .online-card {
+      width: min(760px, 100%);
+      border: 1px solid rgba(61, 99, 70, 0.18);
+      border-radius: 8px;
+      background: #fff;
+      padding: 28px;
+      box-shadow: 0 20px 60px rgba(29, 54, 34, 0.12);
+    }
+    .online-card h1 {
+      margin: 0 0 12px;
+      font-size: 30px;
+      line-height: 1.2;
+      color: #1d4e2a;
+    }
+    .online-card p {
+      margin: 10px 0;
+      color: #52645a;
+      line-height: 1.65;
+    }
+    .online-card code {
+      display: inline-block;
+      max-width: 100%;
+      overflow-wrap: anywhere;
+      border-radius: 6px;
+      padding: 3px 6px;
+      color: #16381f;
+      background: #edf6ea;
+    }
+    .online-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 20px;
+    }
+    .online-actions a {
+      display: inline-flex;
+      align-items: center;
+      min-height: 42px;
+      border-radius: 999px;
+      padding: 10px 16px;
+      text-decoration: none;
+      font-weight: 800;
+      color: #fff;
+      background: #2f7d45;
+    }
+    .online-actions a.secondary {
+      color: #1d4e2a;
+      border: 1px solid rgba(61, 99, 70, 0.2);
+      background: #f5fbf2;
+    }
+  </style>
+</head>
+<body>
+  <noscript>You need to enable JavaScript to run this page.</noscript>
+  <div id="root"></div>
+  <script>
+    function isLocalJbrowseHost() {
+      return ['localhost', '127.0.0.1', '0.0.0.0'].includes(window.location.hostname);
+    }
+
+    function renderOnlineNotice() {
+      document.getElementById('root').innerHTML = `
+        <main class="online-note">
+          <section class="online-card">
+            <h1>Genome browser data is local-only for now</h1>
+            <p>Online JBrowse reference data is not hosted because the indexed reference genome files are about 1.7 GB. The main gene search, function scoring, annotations, downloads, and BLAST pages remain available online.</p>
+            <p>For full JBrowse structure viewing, run the local project server and open:</p>
+            <p><code>http://127.0.0.1:8002/data/processed/jbrowse-app/index.html</code></p>
+            <p>Recommended local command:</p>
+            <p><code>npx http-server . -p 8002 -c-1 --cors</code></p>
+            <div class="online-actions">
+              <a href="../../../#/">Back to Konjac Gene Explorer</a>
+              <a class="secondary" href="../../../#help">Help</a>
+            </div>
+          </section>
+        </main>
+      `;
+    }
+
+    if (isLocalJbrowseHost()) {
+      const script = document.createElement('script');
+      script.defer = true;
+      script.src = 'static/js/main.d3da3f70.js';
+      document.head.appendChild(script);
+    } else {
+      renderOnlineNotice();
+    }
+  </script>
+</body>
+</html>
