@@ -13,6 +13,8 @@ Thumbs.db
 # Large JBrowse reference assemblies; regenerate or host separately
 /data/processed/jbrowse/assemblies/*.fna*
 /data/processed/jbrowse-app/assemblies/*.fna*
+/data/processed/jbrowse/assemblies/*.bgz*
+/data/processed/jbrowse-app/assemblies/*.bgz*
 
 # Very large generated annotation index; overlay chunks are kept instead
 /data/processed/annotations/zen/annotation_index.json
@@ -28,3 +30,8 @@ Thumbs.db
 
 # Codex export git database
 .gitdata/
+
+.vercel
+
+# Local deployment staging package
+/vercel-deploy-package/
