@@ -17,8 +17,11 @@
       <div class="nav-links" aria-label="主要导航">
         <a href="#/">首页</a>
         <a href="#search">查询</a>
+        <a href="#score">评分</a>
         <a href="#topics">专题</a>
+        <a href="#kgm">KGM</a>
         <a href="#browse">浏览</a>
+        <a href="#bulk">批量</a>
         <a href="./data/processed/jbrowse-app/index.html">基因组浏览器</a>
         <a href="#blast">BLAST</a>
         <a href="#downloads">下载</a>
@@ -53,7 +56,10 @@
 
       <div class="home-search">
         <div class="search-main home-search-main">
-          <input id="homeSearchInput" type="search" placeholder="搜索 gene ID、KGM、GO:0003677、PF00069、WRKY..." autocomplete="off" />
+          <input id="homeSearchInput" type="search" placeholder="搜索 gene ID、KGM、GO:0003677、PF00069、WRKY；如 AK:WRKY" autocomplete="off" />
+          <select id="homeSpeciesFilter" class="species-inline-select" aria-label="首页按物种筛选">
+            <option value="">全部物种</option>
+          </select>
           <button class="button primary" id="homeSearchButton">开始查询</button>
         </div>
         <div class="quick-row" id="homeQuickSearches" aria-label="常用搜索"></div>
@@ -73,7 +79,10 @@
 
       <div class="search-box">
         <div class="search-main">
-          <input id="searchInput" type="search" placeholder="例如：evm.model.HIC_ASM_10.860_Akon、KGM、CSLA、GO:0003677、PF00069、WRKY" autocomplete="off" />
+          <input id="searchInput" type="search" placeholder="例如：evm.model.HIC_ASM_10.860_Akon、AK:WRKY、KGM、CSLA、GO:0003677、PF00069" autocomplete="off" />
+          <select id="speciesFilter" class="species-inline-select" aria-label="按物种筛选">
+            <option value="">全部物种</option>
+          </select>
           <button class="button primary" id="searchButton">搜索</button>
           <button class="button ghost" id="resetButton">重置</button>
         </div>
@@ -89,11 +98,6 @@
               <option value="tf">转录因子</option>
               <option value="homology">同源命中</option>
               <option value="location">染色体/坐标</option>
-            </select>
-          </label>
-          <label>物种
-            <select id="speciesFilter" aria-label="按物种筛选">
-              <option value="">全部物种</option>
             </select>
           </label>
           <label>注释状态
@@ -158,7 +162,7 @@
             <thead>
               <tr>
                 <th>Gene ID</th>
-                <th>名称/别名</th>
+                <th>基因名称/别名</th>
                 <th>位置</th>
                 <th>功能摘要</th>
                 <th>证据</th>
@@ -170,6 +174,15 @@
         </div>
         <div id="emptyHelp" class="empty-help" hidden></div>
       </div>
+    </section>
+
+    <section class="panel view-shell" id="scoreView" data-view="score" hidden>
+      <div class="section-heading">
+        <p class="eyebrow">Function scorer</p>
+        <h2>功能候选评分</h2>
+        <p>输入 Gene ID 或功能关键词，基于现有注释证据进行可解释评分。当前不调用外部 API。</p>
+      </div>
+      <div id="scoreContent" class="score-tool"></div>
     </section>
 
     <section class="panel view-shell" id="geneView" data-view="gene" hidden>
@@ -193,6 +206,15 @@
       <div id="topicCards" class="topic-grid"></div>
     </section>
 
+    <section class="panel view-shell" id="kgmView" data-view="kgm" hidden>
+      <div class="section-heading">
+        <p class="eyebrow">KGM topic</p>
+        <h2>葡甘聚糖候选基因专题</h2>
+        <p>围绕 konjac glucomannan、细胞壁、多糖合成和糖基转移相关注释整理候选基因。</p>
+      </div>
+      <div id="kgmContent" class="kgm-topic"></div>
+    </section>
+
     <section class="panel view-shell" id="browseView" data-view="browse" hidden>
       <div class="section-heading">
         <p class="eyebrow">Browse</p>
@@ -200,6 +222,15 @@
         <p>点击标签会跳转到搜索页并自动执行查询。</p>
       </div>
       <div id="browsePanels" class="browse-grid"></div>
+    </section>
+
+    <section class="panel view-shell" id="bulkView" data-view="bulk" hidden>
+      <div class="section-heading">
+        <p class="eyebrow">Bulk tools</p>
+        <h2>批量 Gene ID 工具</h2>
+        <p>粘贴多个 Gene ID，批量查看注释、导出表格或下载序列。</p>
+      </div>
+      <div id="bulkContent" class="bulk-tool"></div>
     </section>
 
     <section class="panel view-shell" id="downloadsView" data-view="downloads" hidden>
@@ -217,8 +248,8 @@
     <section class="panel view-shell" id="blastView" data-view="blast" hidden>
       <div class="section-heading">
         <p class="eyebrow">BLAST</p>
-        <h2>BLAST 队列与本地 worker</h2>
-        <p>BLAST 提交使用 Supabase 登录和任务队列；实际计算由本机 worker 运行 BLAST+ 后写回结果。</p>
+        <h2>BLAST 序列比对</h2>
+        <p>提交核酸或蛋白序列，搜索花魔芋 CDS、蛋白和基因组数据库。</p>
       </div>
       <div id="blastContent" class="blast-grid"></div>
     </section>
@@ -244,24 +275,25 @@
         <article class="card">
           <h3>引用与许可</h3>
           <dl>
-            <dt>PlantGARDEN</dt><dd>待补充</dd>
-            <dt>ZEN</dt><dd>待补充</dd>
-            <dt>NCBI assembly</dt><dd>待补充</dd>
+            <dt>PlantGARDEN</dt><dd>Amorphophallus konjac genome and gene annotation resources</dd>
+            <dt>ZEN</dt><dd>ZEN annotation v2.0 annotation package</dd>
+            <dt>NCBI assembly</dt><dd>GCA_022559845.1</dd>
             <dt>外部资源</dt><dd>GO、KEGG/KO/EC、InterPro、Pfam、PlantTFDB</dd>
-            <dt>Citation</dt><dd>待补充</dd>
-            <dt>License</dt><dd>待补充</dd>
+            <dt>Citation</dt><dd>Konjac Gene Explorer, data release 2026-04-29</dd>
+            <dt>License</dt><dd>请同时遵循原始数据源和外部注释数据库的使用条款。</dd>
           </dl>
         </article>
         <article class="card full">
           <h3>解释与使用边界</h3>
           <ul class="check-list">
             <li>候选基因来自功能注释、结构域、GO/KEGG、同源命中和专题关键字筛选，不等同于实验验证结果。</li>
+            <li>目前完整基因注释、CDS、蛋白和 JBrowse 轨道已接入花魔芋；白魔芋、珠芽魔芋和疣柄魔芋仍需完整基因集后再导入搜索库。</li>
             <li>用于论文、报告或公开数据发布前，应核对 PlantGARDEN、ZEN、NCBI、GO、KEGG、InterPro、Pfam、PlantTFDB 的正式引用和许可要求。</li>
-            <li>DOI、正式许可、维护者和联系邮箱当前均为待补充信息，本站不会编造缺失来源。</li>
+            <li>使用本站结果发表或展示时，建议同时引用原始基因组、注释和外部数据库来源。</li>
           </ul>
         </article>
       </div>
-      <p class="notice">说明：本网站是静态数据浏览器，已接入 JBrowse 静态基因组浏览器；BLAST 使用 Supabase 队列和本机 worker，表达矩阵和共表达网络可在后续版本继续加入。</p>
+      <p class="notice">说明：本站整合花魔芋基因组、基因结构、功能注释、序列检索、基因组浏览器和 BLAST 查询；表达矩阵和共表达网络可在后续版本继续加入。</p>
     </section>
 
     <section class="panel view-shell" id="helpView" data-view="help" hidden>
@@ -274,6 +306,7 @@
           <h3>搜索示例</h3>
           <ul>
             <li>精确 gene ID：<code>evm.model.HIC_ASM_10.860_Akon</code></li>
+            <li>物种前缀：<code>AK:evm.model.HIC_ASM_10.860_Akon</code> 或 <code>AKevm.model.HIC_ASM_10.860_Akon</code></li>
             <li>结构域：<code>PF00069</code>、<code>IPR000719</code></li>
             <li>GO：<code>GO:0003677</code> 或 <code>DNA binding</code></li>
             <li>魔芋关键词：<code>KGM</code>、<code>CSLA</code>、<code>WRKY</code></li>
@@ -281,18 +314,17 @@
           </ul>
         </article>
         <article class="card">
-          <h3>本地运行</h3>
-          <p>进入项目根目录后运行：</p>
-          <pre><code>npx http-server . -p 8002 -c-1 --cors</code></pre>
-          <p>然后在浏览器中打开：</p>
-          <pre><code>http://127.0.0.1:8002/#/</code></pre>
+          <h3>基因组浏览器</h3>
+          <p>基因详情页提供“在基因组浏览器中查看”入口，可跳转到对应坐标并显示基因结构。</p>
+          <p class="help-note">如果轨道加载较慢，请等待参考序列和 GFF 轨道完成加载后再操作视图。</p>
         </article>
         <article class="card">
-          <h3>常见问题与后续升级</h3>
+          <h3>常见问题</h3>
           <ul>
-            <li>当前页面是纯静态站，搜索结果和详情都来自本地数据文件。</li>
             <li>如果 URL 中带有 <code>#search?q=...</code> 或 <code>#gene/...</code>，刷新后会恢复到对应视图。</li>
-            <li>JBrowse 已接入静态基因组浏览器；BLAST 使用 Supabase 队列和本机 worker，表达模块后续需要额外数据。</li>
+            <li>搜索栏旁的物种选择可限制搜索范围；不选择时搜索当前已接入的全部基因记录。</li>
+            <li>BLAST 任务提交后可能需要等待计算节点处理，刷新任务可查看最新状态。</li>
+            <li>表达图谱和多物种比较将在获得完整表达矩阵或其他物种基因集后加入。</li>
           </ul>
         </article>
       </div>
@@ -305,6 +337,8 @@
     <p>Konjac Gene Explorer v1.2.1 · Static real-data build · PlantGARDEN t78372.G001 / ZEN annotation v2.0.</p>
   </footer>
 
+  <script src="./scripts/gene-display-core.js"></script>
+  <script src="./scripts/function-scorer-core.js"></script>
   <script src="./app.js"></script>
 </body>
 </html>

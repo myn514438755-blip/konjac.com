@@ -10,7 +10,7 @@ const BLAST_FUNCTION_URL = `${SUPABASE_URL}/functions/v1/blast`;
 const BLAST_JOB_STORAGE_KEY = 'konjac_blast_last_job_v1';
 const SUPABASE_AUTH_STORAGE_KEY = 'konjac_supabase_auth_v1';
 
-const VIEW_IDS = ['homeView', 'searchView', 'geneView', 'topicsView', 'browseView', 'downloadsView', 'blastView', 'sourcesView', 'helpView'];
+const VIEW_IDS = ['homeView', 'searchView', 'scoreView', 'geneView', 'topicsView', 'kgmView', 'browseView', 'bulkView', 'downloadsView', 'blastView', 'sourcesView', 'helpView'];
 const SEQUENCE_FILES = {
   cds: './downloads/Amorphophallus_konjac.clean.cds',
   protein: './downloads/Amorphophallus_konjac.clean.pep'
@@ -25,6 +25,41 @@ const TOPICS = [
   { id: 'kinase', title: 'Kinase / receptor', description: 'Search kinase and receptor-like protein families.', keywords: ['kinase', 'receptor-like', 'protein kinase', 'serine/threonine', 'tyrosine kinase'], example: 'protein kinase' },
   { id: 'transporter', title: 'Transporter', description: 'Search transporter, ABC transporter and aquaporin genes.', keywords: ['transporter', 'abc transporter', 'aquaporin', 'sugar transporter', 'amino acid transporter'], example: 'transporter' },
   { id: 'cellwall', title: 'Cell wall', description: 'Search cell wall genes such as expansin, pectin and lignin.', keywords: ['cell wall', 'expansin', 'pectin', 'cellulose', 'xylan', 'lignin', 'xyloglucan'], example: 'cell wall' }
+];
+
+const SPECIES_OPTIONS = [
+  {
+    value: 'amorphophallus konjac',
+    label: '花魔芋 / A. konjac',
+    codes: ['ak', 'akon', 'konjac'],
+    catalog: true,
+    status: '已接入完整基因注释',
+    source: 'PlantGARDEN gene models, CDS, protein, ZEN annotations'
+  },
+  {
+    value: 'amorphophallus albus',
+    label: '白魔芋 / A. albus',
+    codes: ['aa', 'albus', 'white'],
+    catalog: false,
+    status: '待导入基因集',
+    source: 'NCBI BioProject PRJNA1208222；本地目前仅有 RNA-seq / AkECH 筛查线索'
+  },
+  {
+    value: 'amorphophallus bulbifer',
+    label: '珠芽魔芋 / A. bulbifer',
+    codes: ['ab', 'bulbifer'],
+    catalog: false,
+    status: '待导入基因集',
+    source: '目前仅有 RNA-seq / AkECH 筛查线索'
+  },
+  {
+    value: 'amorphophallus muelleri',
+    label: '疣柄魔芋 / A. muelleri',
+    codes: ['am', 'muelleri'],
+    catalog: false,
+    status: '待导入基因集',
+    source: '目前仅有候选运行清单'
+  }
 ];
 
 const SYNONYMS = {
@@ -45,7 +80,8 @@ const DOWNLOAD_META = {
   'zen_go_v2.0.tsv': { label: 'ZEN GO', description: 'GO 注释结果。' },
   'zen_goslim_v2.0.tsv': { label: 'ZEN GO slim', description: 'GO slim 分类结果。' },
   'zen_interpro_v2.0.tsv': { label: 'ZEN InterPro', description: 'InterPro 结构域注释结果。' },
-  'zen_pfam_v2.0.tsv': { label: 'ZEN Pfam', description: 'Pfam 结构域注释结果。' }
+  'zen_pfam_v2.0.tsv': { label: 'ZEN Pfam', description: 'Pfam 结构域注释结果。' },
+  'species_catalog.json': { label: '物种接入清单', description: '记录花魔芋与待导入魔芋物种的数据状态、搜索前缀和后续所需文件。' }
 };
 
 const $ = (selector) => document.querySelector(selector);
@@ -82,6 +118,11 @@ const state = {
   overlayChunkCache: new Map(),
   overlayChunkPromise: new Map(),
   blastPollTimer: null,
+  lastBlastResult: null,
+  bulkRows: [],
+  kgmRows: [],
+  scoreRows: [],
+  scoreMode: '',
   authSession: null
 };
 
@@ -96,9 +137,10 @@ function setVisibleViews(activeIds = []) {
   document.body.dataset.view = activeIds[0] || 'home';
 }
 
-function showView(view) {
+function showView(view, options = {}) {
+  const { resetScroll = true } = options;
   setVisibleViews([`${view}View`]);
-  window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+  if (resetScroll) window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
 }
 
 function renderFallback(value, fallback = '暂无注释') {
@@ -129,6 +171,70 @@ function renderSearchStatus({ query = '', count = null, elapsedMs = null, filter
   if (elapsedMs !== null && elapsedMs !== undefined) parts.push(`耗时：${escapeHtml(formatDuration(elapsedMs))}`);
   if (filters && filters.length) parts.push(`筛选：${filters.map(escapeHtml).join('；')}`);
   box.innerHTML = parts.map(part => `<span class="filter-pill">${part}</span>`).join('');
+}
+
+function speciesLabel(value = '') {
+  const normalized = normalize(value);
+  const match = SPECIES_OPTIONS.find(item => item.value === normalized);
+  return match?.label || value || '全部物种';
+}
+
+function speciesStatus(value = '') {
+  const normalized = normalize(value);
+  const match = SPECIES_OPTIONS.find(item => item.value === normalized);
+  return match?.status || '全部物种';
+}
+
+function speciesDataNote(value = '') {
+  const normalized = normalize(value);
+  const match = SPECIES_OPTIONS.find(item => item.value === normalized);
+  if (!match || match.catalog) return '';
+  return `${match.label}：${match.status}。${match.source}，尚未整理成可搜索的完整基因模型、CDS、蛋白和注释表。`;
+}
+
+function populateSpeciesFilters() {
+  const html = [
+    '<option value="">全部物种</option>',
+    ...SPECIES_OPTIONS.map(item => `<option value="${escapeHtml(item.value)}">${escapeHtml(item.label)} · ${escapeHtml(item.status)}</option>`)
+  ].join('');
+  ['homeSpeciesFilter', 'speciesFilter'].forEach((id) => {
+    const select = qs(id);
+    if (!select) return;
+    const current = select.value;
+    select.innerHTML = html;
+    if (current && SPECIES_OPTIONS.some(item => item.value === current)) select.value = current;
+  });
+}
+
+function setSpeciesFilterValue(value = '') {
+  const normalized = normalize(value);
+  ['homeSpeciesFilter', 'speciesFilter'].forEach((id) => {
+    const select = qs(id);
+    if (select) select.value = normalized;
+  });
+}
+
+function syncSpeciesFilters(sourceId) {
+  const source = qs(sourceId);
+  if (!source) return;
+  setSpeciesFilterValue(source.value || '');
+}
+
+function extractSpeciesScopedQuery(value = '') {
+  const raw = String(value || '').trim();
+  const match = /^([A-Za-z]{2,12})(?::|\s+|-|_)(.+)$/.exec(raw);
+  if (!match) {
+    const prefix = SPECIES_OPTIONS
+      .flatMap(species => species.codes.map(code => ({ species, code })))
+      .sort((a, b) => b.code.length - a.code.length)
+      .find(({ code }) => raw.toLowerCase().startsWith(code) && /^evm\.|^gene|^transcript|^protein/i.test(raw.slice(code.length)));
+    if (!prefix) return { query: raw, speciesFilter: '' };
+    return { query: raw.slice(prefix.code.length).trim(), speciesFilter: prefix.species.value };
+  }
+  const code = match[1].toLowerCase();
+  const species = SPECIES_OPTIONS.find(item => item.codes.includes(code));
+  if (!species) return { query: raw, speciesFilter: '' };
+  return { query: match[2].trim(), speciesFilter: species.value };
 }
 
 function showLoadingError(error) {
@@ -415,7 +521,7 @@ function updateStats() {
   qs('statKegg').textContent = formatNumber(s.kegg_annotated_genes ?? '-');
   qs('statInterpro').textContent = formatNumber(s.interpro_annotated_genes ?? '-');
   qs('statTf').textContent = formatNumber(s.plantTFDB_genes ?? '-');
-  qs('statUpdated').textContent = s.website_last_updated || '待补充';
+  qs('statUpdated').textContent = s.website_last_updated || '2026-04-29';
 }
 
 async function loadSummary() {
@@ -565,8 +671,9 @@ function ensureSearchWorker() {
 function searchInWorker(query) {
   if (!state.searchWorker || !state.searchWorkerReady) return Promise.resolve(null);
   const requestId = ++state.searchRequestId;
+  const scoped = extractSpeciesScopedQuery(query);
   const fieldMode = qs('fieldFilter')?.value || 'all';
-  const speciesFilter = qs('speciesFilter')?.value || '';
+  const speciesFilter = scoped.speciesFilter || qs('speciesFilter')?.value || '';
   const annotationFilter = qs('annotationFilter')?.value || '';
   const sortMode = qs('sortMode')?.value || 'relevance';
   return new Promise((resolve, reject) => {
@@ -575,7 +682,7 @@ function searchInWorker(query) {
       state.searchWorker.postMessage({
         type: 'search',
         requestId,
-        query,
+        query: scoped.query,
         fieldMode,
         speciesFilter,
         annotationFilter,
@@ -621,13 +728,16 @@ function getCachedFieldText(gene, mode) {
 function renderHomeModules() {
   const items = [
     { title: '基因查询', href: '#search', desc: '输入 Gene ID、GO、KEGG、Pfam 或转录因子家族进行查询。' },
+    { title: '功能候选评分', href: '#score', desc: '输入基因或功能关键词，按注释证据给出候选基因评分和命中依据。' },
     { title: '魔芋研究专题', href: '#topics', desc: '进入 KGM、CSLA、转录因子、抗病和细胞壁专题入口。' },
+    { title: 'KGM 专题', href: '#kgm', desc: '查看葡甘聚糖、细胞壁和糖基转移相关候选基因。' },
     { title: '注释分类浏览', href: '#browse', desc: '按 GO、InterPro、Pfam 和同源物种快速浏览。' },
+    { title: '批量工具', href: '#bulk', desc: '批量查询 Gene ID，导出注释表，并下载 CDS 或蛋白序列。' },
     { title: '基因组浏览器', href: './data/processed/jbrowse-app/index.html', desc: '查看基因组坐标、基因结构和 GFF 注释轨道。' },
-    { title: 'BLAST 本地说明', href: '#blast', desc: '查看已准备好的 BLAST 数据库、示例序列和本地运行命令。' },
+    { title: 'BLAST 序列比对', href: '#blast', desc: '提交核酸或蛋白序列，查看与花魔芋 CDS、蛋白和基因组数据库的相似性结果。' },
     { title: '数据下载', href: '#downloads', desc: '下载整合表、GFF、CDS、protein FASTA 和 ZEN 文件。' },
     { title: '数据来源与引用', href: '#sources', desc: '查看数据来源、引用格式、许可说明和维护信息。' },
-    { title: '使用帮助', href: '#help', desc: '查看搜索示例、本地运行方法和后续升级计划。' }
+    { title: '使用帮助', href: '#help', desc: '查看搜索、基因详情、基因组浏览器和 BLAST 的使用方法。' }
   ];
   qs('homeModules').innerHTML = items.map(item => `
     <a class="module-card" href="${escapeHtml(item.href)}">
@@ -661,12 +771,147 @@ function renderTopicCards() {
           <span>候选基因</span>
         </div>
         <div class="topic-actions">
+          ${topic.id === 'kgm' ? '<a class="button small" href="#kgm">打开专题页</a>' : ''}
           <button class="button ghost small" data-topic-search="${topic.id}">Filter this topic</button>
           <button class="button secondary small" data-search="${escapeHtml(topic.example)}">Example search</button>
         </div>
       </article>
     `;
   }).join('');
+}
+
+function scoreKgmCandidate(gene) {
+  const text = [
+    gene.gene_id,
+    gene.gene_symbol,
+    gene.functional_annotation,
+    gene.plantTFDB_family,
+    ...(gene.go_terms || []),
+    ...(gene.go_slim_terms || []),
+    ...(gene.interpro_domains || []),
+    ...(gene.pfam_domains || []),
+    ...(gene.kegg_terms || []),
+    gene.ko_id,
+    gene.ec_number
+  ].filter(Boolean).join(' ').toLowerCase();
+  const rules = [
+    ['glucomannan', 12],
+    ['mannan', 10],
+    ['cellulose synthase-like', 10],
+    ['csla', 10],
+    ['csl', 6],
+    ['glycosyltransferase', 8],
+    ['glycosyl transferase', 8],
+    ['mannosyltransferase', 10],
+    ['cell wall', 5],
+    ['polysaccharide', 5],
+    ['sugar', 3],
+    ['transferase', 2]
+  ];
+  return rules.reduce((score, [term, weight]) => score + (text.includes(term) ? weight : 0), 0);
+}
+
+function buildKgmRows() {
+  return state.genes
+    .map(gene => ({ gene, score: scoreKgmCandidate(gene) }))
+    .filter(item => item.score > 0)
+    .sort((a, b) => b.score - a.score || String(a.gene.gene_id).localeCompare(String(b.gene.gene_id)))
+    .map(({ gene, score }) => ({
+      gene_id: gene.gene_id,
+      score,
+      location: geneLocation(gene),
+      annotation: displayValue(gene.functional_annotation, ''),
+      tf: displayValue(gene.plantTFDB_family, ''),
+      ko: displayValue(gene.ko_id, ''),
+      ec: displayValue(gene.ec_number, ''),
+      pfam: listFrom(gene.pfam_domains).slice(0, 6).join('; '),
+      go: listFrom(gene.go_terms).slice(0, 6).join('; ')
+    }));
+}
+
+function renderKgmTopicContent() {
+  const host = qs('kgmContent');
+  if (!host) return;
+  if (!state.genesLoaded) {
+    host.innerHTML = `
+      <article class="card full">
+        <h3>正在加载候选基因</h3>
+        <p class="muted">正在读取基因注释数据...</p>
+        <div class="loader-line"></div>
+      </article>
+    `;
+    void loadGenes().then(renderKgmTopicContent).catch(error => {
+      host.innerHTML = `<article class="card full"><h3>加载失败</h3><p class="download-warning">${escapeHtml(error.message || '无法加载基因数据')}</p></article>`;
+    });
+    return;
+  }
+  const rows = buildKgmRows();
+  state.kgmRows = rows;
+  const topRows = rows.slice(0, 80);
+  const tfCount = rows.filter(row => row.tf).length;
+  const pfamCount = rows.filter(row => row.pfam).length;
+  const koCount = rows.filter(row => row.ko || row.ec).length;
+  host.innerHTML = `
+    <article class="card full">
+      <h3>专题概览</h3>
+      <div class="hero-stats compact-stats">
+        <div><strong>${formatNumber(rows.length)}</strong><span>候选基因</span></div>
+        <div><strong>${formatNumber(pfamCount)}</strong><span>含 Pfam</span></div>
+        <div><strong>${formatNumber(koCount)}</strong><span>含 KO/EC</span></div>
+        <div><strong>${formatNumber(tfCount)}</strong><span>转录因子</span></div>
+      </div>
+      <p class="help-note">候选列表由关键词和注释证据自动筛选，用于快速聚焦 KGM、细胞壁和多糖合成相关基因，不等同于实验验证。</p>
+      <div class="bulk-actions">
+        <button class="button ghost small" type="button" data-search="glucomannan">搜索 glucomannan</button>
+        <button class="button ghost small" type="button" data-search="CSLA">搜索 CSLA</button>
+        <button class="button ghost small" type="button" data-search="glycosyltransferase">搜索 glycosyltransferase</button>
+        <button class="button small" type="button" id="kgmDownloadCsv">下载候选基因 CSV</button>
+      </div>
+    </article>
+    <article class="card full">
+      <h3>候选基因列表</h3>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Gene ID</th><th>Score</th><th>Location</th><th>Annotation</th><th>TF</th><th>KO/EC</th><th>Pfam</th></tr>
+          </thead>
+          <tbody>
+            ${topRows.map(row => `
+              <tr>
+                <td data-label="Gene ID"><a class="gene-link" href="#gene/${encodeURIComponent(row.gene_id)}">${escapeHtml(row.gene_id)}</a></td>
+                <td data-label="Score">${formatNumber(row.score)}</td>
+                <td data-label="Location"><code>${escapeHtml(row.location)}</code></td>
+                <td data-label="Annotation">${escapeHtml(row.annotation || '暂无注释')}</td>
+                <td data-label="TF">${escapeHtml(row.tf || '-')}</td>
+                <td data-label="KO/EC">${escapeHtml([row.ko, row.ec].filter(Boolean).join(' / ') || '-')}</td>
+                <td data-label="Pfam">${escapeHtml(row.pfam || '-')}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+      <p class="help-note">表格默认显示前 80 个高分候选；完整候选列表可下载 CSV。</p>
+    </article>
+  `;
+}
+
+function downloadKgmCsv() {
+  const rows = state.kgmRows.length ? state.kgmRows : buildKgmRows();
+  if (!rows.length) { showToast('暂无 KGM 候选基因'); return; }
+  const fields = ['gene_id', 'score', 'location', 'annotation', 'tf', 'ko', 'ec', 'pfam', 'go'];
+  const esc = (value) => `"${String(value ?? '').replace(/"/g, '""')}"`;
+  const csv = [
+    fields.join(','),
+    ...rows.map(row => fields.map(field => esc(row[field])).join(','))
+  ].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = 'konjac_kgm_candidate_genes.csv';
+  link.click();
+  URL.revokeObjectURL(url);
+  showToast('KGM 候选基因 CSV 已开始下载');
 }
 
 function renderBrowsePanels() {
@@ -697,8 +942,11 @@ function renderBrowsePanels() {
 
 function renderDownloadCards() {
   const version = state.summary.version || 'v1.2.1';
-  const updated = state.summary.website_last_updated || '待补充';
-  const files = (state.summary.downloads || []).map(item => ({ name: item.name, path: './' + item.path, bytes: item.bytes, available: true }));
+  const updated = state.summary.website_last_updated || '2026-04-29';
+  const files = [
+    ...(state.summary.downloads || []).map(item => ({ name: item.name, path: './' + item.path, bytes: item.bytes, available: true })),
+    { name: 'species_catalog.json', path: './data/processed/species_catalog.json', bytes: null, available: true }
+  ];
   qs('downloadCards').innerHTML = files.map(file => {
     const meta = DOWNLOAD_META[file.name] || { label: file.name, description: '下载文件' };
     const unavailable = !file.path;
@@ -712,13 +960,24 @@ function renderDownloadCards() {
           <dt>说明</dt><dd>${escapeHtml(meta.description)}</dd>
           <dt>版本</dt><dd>${escapeHtml(version)}</dd>
           <dt>更新时间</dt><dd>${escapeHtml(updated)}</dd>
-          <dt>大小</dt><dd>${file.bytes ? formatBytes(file.bytes) : '待补充'}</dd>
+          <dt>大小</dt><dd>${file.bytes ? formatBytes(file.bytes) : '暂未统计'}</dd>
         </dl>
         ${unavailable ? '<p class="download-warning">下载链接不可用</p>' : ''}
         <a class="button ghost small" href="${escapeHtml(file.path || '#')}" ${unavailable ? 'aria-disabled="true" tabindex="-1"' : ''} download>${unavailable ? '不可用' : '下载文件'}</a>
       </article>
     `;
   }).join('');
+}
+
+function renderSpeciesCatalogRows() {
+  return SPECIES_OPTIONS.map(species => `
+    <tr>
+      <td data-label="物种">${escapeHtml(species.label)}</td>
+      <td data-label="搜索前缀"><code>${escapeHtml(species.codes.map(code => code.toUpperCase()).join(' / '))}</code></td>
+      <td data-label="状态"><span class="status-pill">${escapeHtml(species.status)}</span></td>
+      <td data-label="数据来源">${escapeHtml(species.source)}</td>
+    </tr>
+  `).join('');
 }
 
 function renderSourceContent() {
@@ -735,28 +994,38 @@ function renderSourceContent() {
         <dt>功能注释</dt><dd>ZEN annotation v2.0, GO, GO slim, KEGG/KO/EC, InterPro, Pfam, PlantTFDB</dd>
         <dt>基因组浏览器</dt><dd>JBrowse static app with remapped PlantGARDEN clean GFF</dd>
         <dt>网站版本</dt><dd>${escapeHtml(state.summary.version || 'v1.2.1')} static build</dd>
-        <dt>更新时间</dt><dd>${escapeHtml(state.summary.website_last_updated || '待补充')}</dd>
+        <dt>更新时间</dt><dd>${escapeHtml(state.summary.website_last_updated || '2026-04-29')}</dd>
       </dl>
     </article>
     <article class="card">
       <h3>引用与许可</h3>
       <dl>
-        <dt>PlantGARDEN DOI</dt><dd>待补充</dd>
-        <dt>ZEN DOI</dt><dd>待补充</dd>
-        <dt>NCBI assembly DOI / accession</dt><dd>GCA_022559845.1</dd>
-        <dt>外部资源许可</dt><dd>GO、KEGG/KO/EC、InterPro、Pfam、PlantTFDB（待补充）</dd>
-        <dt>维护者</dt><dd>待补充</dd>
-        <dt>联系邮箱</dt><dd>待补充</dd>
-        <dt>许可</dt><dd>待补充</dd>
-        <dt>引用格式</dt><dd>待补充</dd>
+        <dt>PlantGARDEN</dt><dd>Amorphophallus konjac genome and gene annotation resources</dd>
+        <dt>NCBI assembly</dt><dd>GCA_022559845.1</dd>
+        <dt>ZEN annotation</dt><dd>ZEN v2.0 annotation package</dd>
+        <dt>外部注释库</dt><dd>GO, GO slim, KEGG/KO/EC, InterPro, Pfam, PlantTFDB</dd>
+        <dt>引用建议</dt><dd>Konjac Gene Explorer, data release ${escapeHtml(state.summary.website_last_updated || '2026-04-29')}</dd>
+        <dt>许可说明</dt><dd>请同时遵循原始数据源和外部注释数据库的使用条款。</dd>
       </dl>
+    </article>
+    <article class="card full">
+      <h3>物种数据接入状态</h3>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>物种</th><th>搜索前缀</th><th>状态</th><th>数据来源</th></tr>
+          </thead>
+          <tbody>${renderSpeciesCatalogRows()}</tbody>
+        </table>
+      </div>
+      <p class="help-note">不选择物种时搜索当前已接入的全部基因记录；使用 <code>AK:GeneID</code> 或 <code>AKGeneID</code> 可指定花魔芋。其他物种需要导入完整基因模型、CDS、蛋白和注释后才会出现基因详情结果。</p>
     </article>
     <article class="card full">
       <h3>使用说明</h3>
       <ul class="check-list">
-        <li>候选基因来自注释筛选，不等同于实验验证。</li>
-        <li>JBrowse 轨道使用已重映射的 PlantGARDEN clean GFF，可从详情页按坐标跳转。</li>
-        <li>DOI、许可、维护者和联系信息当前均为待补充，发布前需要人工核对。</li>
+        <li>候选基因来自功能注释和相似性证据，不等同于实验验证。</li>
+        <li>基因组浏览器轨道使用已重映射的 PlantGARDEN clean GFF，可从详情页按坐标跳转。</li>
+        <li>使用本站结果发表或展示时，建议同时引用原始基因组、注释和外部数据库来源。</li>
       </ul>
     </article>
   `;
@@ -770,6 +1039,7 @@ function renderHelpContent() {
       <h3>搜索示例</h3>
       <ul>
         <li><code>evm.model.HIC_ASM_10.860_Akon</code></li>
+        <li><code>AK:evm.model.HIC_ASM_10.860_Akon</code> 或 <code>AKevm.model.HIC_ASM_10.860_Akon</code> 指定花魔芋</li>
         <li><code>PF00069</code> / <code>IPR000719</code></li>
         <li><code>GO:0003677</code> / <code>DNA binding</code></li>
         <li><code>KGM</code> / <code>CSLA</code> / <code>WRKY</code></li>
@@ -780,194 +1050,664 @@ function renderHelpContent() {
       <ol class="help-steps">
         <li>首页输入精确 Gene ID 会直接进入详情页。</li>
         <li>输入关键词、GO、KEGG、Pfam 或转录因子家族会进入搜索结果页。</li>
+        <li>搜索栏旁的物种选择可限制搜索范围；不选择时搜索当前已接入的全部基因记录。</li>
         <li>在结果中点击 Gene ID 或“查看详情”进入基因详情。</li>
         <li>在详情页查看功能注释、序列、JBrowse 坐标和下载链接。</li>
       </ol>
       <p class="help-note">基因组浏览器用于查看基因组坐标、基因结构和 GFF 注释轨道。</p>
     </article>
     <article class="card">
-      <h3>本地运行</h3>
-      <pre><code>npx http-server . -p 8002 -c-1 --cors</code></pre>
-      <p>然后打开 <code>http://127.0.0.1:8002/#/</code>。</p>
-    </article>
-    <article class="card">
-      <h3>JBrowse 本地预览</h3>
-      <pre><code>http://127.0.0.1:8002/data/processed/jbrowse-app/index.html</code></pre>
-      <p class="help-note">不要用不支持 Range 请求的临时服务器预览 JBrowse，否则可能出现 invalid bgzf、Downloading sequence 或轨道无法加载的问题。</p>
+      <h3>基因组浏览器</h3>
+      <p>基因详情页提供“在基因组浏览器中查看”入口，可跳转到对应坐标并显示基因结构。</p>
+      <p class="help-note">如果浏览器轨道加载较慢，请等待参考序列和 GFF 轨道完成加载后再缩放或移动视图。</p>
     </article>
     <article class="card">
       <h3>BLAST</h3>
-      <p>当前版本提供 Supabase 登录提交、任务队列和本机 BLAST worker 流程。</p>
+      <p>BLAST 支持核酸和蛋白序列查询，可选择 CDS、蛋白或基因组数据库作为搜索集。</p>
       <a class="button ghost small" href="#blast">打开 BLAST</a>
     </article>
     <article class="card full">
-      <h3>后续升级</h3>
+      <h3>数据解释</h3>
       <ul class="check-list">
-        <li>BLAST 已采用无云服务器队列方案；本机 worker 在线时才会处理任务。</li>
-        <li>表达热图需要 expression_tpm.csv 和 sample_metadata.csv。</li>
-        <li>“待补充”表示该信息尚未核实，不会自动编造。</li>
+        <li>功能注释来自自动注释和外部数据库映射，建议结合实验验证解读。</li>
+        <li>BLAST 任务提交后可能需要等待计算节点处理，刷新任务可查看最新状态。</li>
+        <li>表达图谱和多物种比较将在获得完整表达矩阵或其他物种基因集后加入。</li>
       </ul>
     </article>
   `;
 }
 
+function renderBulkContent() {
+  const host = qs('bulkContent');
+  if (!host) return;
+  host.innerHTML = `
+    <article class="card full">
+      <h3>输入 Gene ID</h3>
+      <textarea id="bulkGeneIds" class="bulk-textarea" rows="8" spellcheck="false" placeholder="每行一个 Gene ID，例如&#10;evm.model.CTG_28.2_Akon&#10;evm.model.HIC_ASM_6.713_Akon"></textarea>
+      <div class="bulk-actions">
+        <button class="button" type="button" id="bulkLookup">批量查询</button>
+        <button class="button ghost" type="button" id="bulkExample">填入示例</button>
+        <button class="button ghost" type="button" id="bulkDownloadCsv" disabled>下载注释 CSV</button>
+        <button class="button ghost" type="button" id="bulkDownloadCds" disabled>下载 CDS FASTA</button>
+        <button class="button ghost" type="button" id="bulkDownloadProtein" disabled>下载 protein FASTA</button>
+      </div>
+      <p id="bulkStatus" class="help-note">支持换行、空格、逗号或分号分隔；最多建议一次查询 500 个 Gene ID。</p>
+    </article>
+    <article class="card full" id="bulkResultsCard" hidden>
+      <h3>批量结果</h3>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Gene ID</th><th>Location</th><th>Annotation</th><th>TF</th><th>KO</th><th>EC</th><th>GO</th><th>Pfam</th></tr>
+          </thead>
+          <tbody id="bulkResultsBody"></tbody>
+        </table>
+      </div>
+    </article>
+  `;
+}
+
+function parseBulkGeneIds(value = '') {
+  const seen = new Set();
+  return String(value || '')
+    .split(/[\s,;，；]+/)
+    .map(id => id.trim())
+    .filter(Boolean)
+    .filter((id) => {
+      if (seen.has(id)) return false;
+      seen.add(id);
+      return true;
+    });
+}
+
+function bulkRowFromGene(id) {
+  const gene = state.geneById.get(id);
+  if (!gene) return { id, found: false };
+  return {
+    id,
+    found: true,
+    gene_id: gene.gene_id,
+    location: geneLocation(gene),
+    annotation: displayValue(gene.functional_annotation, ''),
+    tf: displayValue(gene.plantTFDB_family, ''),
+    ko: displayValue(gene.ko_id, ''),
+    ec: displayValue(gene.ec_number, ''),
+    go: listFrom(gene.go_terms).join('; '),
+    pfam: listFrom(gene.pfam_domains).join('; '),
+    interpro: listFrom(gene.interpro_domains).join('; ')
+  };
+}
+
+function setBulkButtonsEnabled(enabled) {
+  ['bulkDownloadCsv', 'bulkDownloadCds', 'bulkDownloadProtein'].forEach((id) => {
+    const button = qs(id);
+    if (button) button.disabled = !enabled;
+  });
+}
+
+function renderBulkRows(rows) {
+  const body = qs('bulkResultsBody');
+  const card = qs('bulkResultsCard');
+  if (!body || !card) return;
+  body.innerHTML = rows.map(row => `
+    <tr class="${row.found ? '' : 'is-missing'}">
+      <td data-label="Gene ID">${row.found ? `<a class="gene-link" href="#gene/${encodeURIComponent(row.gene_id)}">${escapeHtml(row.gene_id)}</a>` : `<code>${escapeHtml(row.id)}</code>`}</td>
+      <td data-label="Location">${row.found ? `<code>${escapeHtml(row.location)}</code>` : '<span class="muted">未找到</span>'}</td>
+      <td data-label="Annotation">${row.found ? escapeHtml(row.annotation || '暂无注释') : '<span class="muted">-</span>'}</td>
+      <td data-label="TF">${row.found ? escapeHtml(row.tf || '-') : '-'}</td>
+      <td data-label="KO">${row.found ? escapeHtml(row.ko || '-') : '-'}</td>
+      <td data-label="EC">${row.found ? escapeHtml(row.ec || '-') : '-'}</td>
+      <td data-label="GO">${row.found ? escapeHtml(row.go || '-') : '-'}</td>
+      <td data-label="Pfam">${row.found ? escapeHtml(row.pfam || '-') : '-'}</td>
+    </tr>
+  `).join('');
+  card.hidden = false;
+}
+
+async function runBulkLookup() {
+  await loadGenes();
+  const ids = parseBulkGeneIds(qs('bulkGeneIds')?.value || '').slice(0, 500);
+  const status = qs('bulkStatus');
+  if (!ids.length) {
+    state.bulkRows = [];
+    setBulkButtonsEnabled(false);
+    if (status) status.textContent = '请先输入 Gene ID。';
+    return;
+  }
+  const rows = ids.map(bulkRowFromGene);
+  state.bulkRows = rows;
+  renderBulkRows(rows);
+  const found = rows.filter(row => row.found).length;
+  setBulkButtonsEnabled(found > 0);
+  if (status) status.textContent = `已查询 ${formatNumber(rows.length)} 个 Gene ID；找到 ${formatNumber(found)} 个，未找到 ${formatNumber(rows.length - found)} 个。`;
+}
+
+function downloadBulkCsv() {
+  const rows = state.bulkRows.filter(row => row.found);
+  if (!rows.length) { showToast('暂无可导出的批量结果'); return; }
+  const fields = ['gene_id', 'location', 'annotation', 'tf', 'ko', 'ec', 'go', 'pfam', 'interpro'];
+  const esc = (value) => `"${String(value ?? '').replace(/"/g, '""')}"`;
+  const csv = [
+    fields.join(','),
+    ...rows.map(row => fields.map(field => esc(row[field])).join(','))
+  ].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = 'konjac_bulk_annotations.csv';
+  link.click();
+  URL.revokeObjectURL(url);
+  showToast('批量注释 CSV 已开始下载');
+}
+
+async function downloadBulkFasta(type) {
+  const rows = state.bulkRows.filter(row => row.found);
+  if (!rows.length) { showToast('暂无可下载的序列'); return; }
+  const records = [];
+  const status = qs('bulkStatus');
+  if (status) status.textContent = `正在准备 ${sequenceLabel(type)} FASTA...`;
+  for (const row of rows.slice(0, 500)) {
+    try {
+      const seqInfo = await getGeneSequence(row.gene_id, type);
+      const header = seqInfo.header.startsWith('>') ? seqInfo.header : `>${seqInfo.header}`;
+      records.push(`${header}\n${wrapSequence(seqInfo.seq)}`);
+    } catch {
+      // Missing sequence for a found gene is skipped in the batch FASTA export.
+    }
+  }
+  if (!records.length) {
+    if (status) status.textContent = `没有可下载的 ${sequenceLabel(type)} 序列。`;
+    showToast('没有可下载的序列');
+    return;
+  }
+  const blob = new Blob([`${records.join('\n')}\n`], { type: 'text/plain;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `konjac_bulk_${type === 'protein' ? 'protein' : 'cds'}.fa`;
+  link.click();
+  URL.revokeObjectURL(url);
+  if (status) status.textContent = `已准备 ${formatNumber(records.length)} 条 ${sequenceLabel(type)} 序列。`;
+  showToast('FASTA 已开始下载');
+}
+
+function getFunctionScorer() {
+  return window.KonjacFunctionScorer || null;
+}
+
+function getGeneDisplay() {
+  return window.KonjacGeneDisplay || {
+    getGeneSymbolLabel: (gene) => normalize(gene?.gene_symbol),
+    getGeneDisplayName: (gene) => displayValue(gene?.functional_annotation, '暂无名称注释')
+  };
+}
+
+function renderScoreContent() {
+  const host = qs('scoreContent');
+  if (!host) return;
+  const themes = getFunctionScorer()?.THEMES || [];
+  host.innerHTML = `
+    <article class="card full score-card">
+      <div class="score-form">
+        <label class="score-input-label">
+          <span>Gene ID 或功能关键词</span>
+          <textarea id="scoreQuery" class="score-textarea" rows="5" spellcheck="false" placeholder="例如：evm.model.HIC_ASM_10.860_Akon&#10;或：glucomannan biosynthesis、PF00069 kinase、WRKY transcription factor"></textarea>
+        </label>
+        <div class="score-controls">
+          <label>分析模式
+            <select id="scoreModeSelect">
+              <option value="auto">自动判断</option>
+              <option value="gene">输入是 Gene ID</option>
+              <option value="function">输入是功能关键词</option>
+            </select>
+          </label>
+          <label>候选数量
+            <select id="scoreLimit">
+              <option value="20">20</option>
+              <option value="50" selected>50</option>
+              <option value="100">100</option>
+            </select>
+          </label>
+          <label class="check-option"><input id="scoreRequireGo" type="checkbox"> 必须有 GO</label>
+          <label class="check-option"><input id="scoreRequireDomain" type="checkbox"> 必须有 Pfam/InterPro</label>
+          <label class="check-option"><input id="scoreOnlyTf" type="checkbox"> 只看转录因子</label>
+        </div>
+        <div class="score-actions">
+          <button class="button primary" type="button" id="scoreRun">开始评分</button>
+          <button class="button ghost" type="button" id="scoreExampleGene">Gene 示例</button>
+          <button class="button ghost" type="button" id="scoreExampleFunction">功能示例</button>
+          <button class="button secondary" type="button" id="scoreDownloadCsv" disabled>下载评分 CSV</button>
+        </div>
+        <p id="scoreStatus" class="help-note">评分只使用现有注释证据，不调用外部 API；100 分表示多类注释证据强支持，不表示真实概率或实验结论。</p>
+      </div>
+    </article>
+    <article class="card full score-card">
+      <h3>当前规则集</h3>
+      <div class="score-theme-list">
+        ${themes.map(theme => `<span class="score-theme-pill" title="${escapeHtml(theme.description)}">${escapeHtml(theme.title)}</span>`).join('')}
+      </div>
+    </article>
+    <article class="card full score-card" id="scoreResultsCard" hidden>
+      <div id="scoreResults"></div>
+    </article>
+  `;
+}
+
+function scoreOptionsFromControls() {
+  return {
+    limit: Number(qs('scoreLimit')?.value || 50),
+    requireGo: Boolean(qs('scoreRequireGo')?.checked),
+    requireDomain: Boolean(qs('scoreRequireDomain')?.checked),
+    onlyTf: Boolean(qs('scoreOnlyTf')?.checked)
+  };
+}
+
+function scoreEvidenceHtml(evidence = []) {
+  if (!evidence.length) return '<span class="muted">无直接命中证据</span>';
+  return `
+    <ul class="score-evidence-list">
+      ${evidence.slice(0, 4).map(item => `
+        <li>
+          <strong>${escapeHtml(item.field)}</strong>
+          <span>${escapeHtml(item.terms.join(', '))}</span>
+          <small>${escapeHtml(item.value)}</small>
+        </li>
+      `).join('')}
+    </ul>
+  `;
+}
+
+function renderScoreBars(rows) {
+  return `
+    <div class="score-bar-list">
+      ${rows.map(row => `
+        <div class="score-bar-row">
+          <div>
+            <strong>${escapeHtml(row.title)}</strong>
+            <span>${escapeHtml(row.description || '')}</span>
+          </div>
+          <div class="score-bar" aria-label="${escapeHtml(row.title)} score ${row.score}">
+            <span style="width:${Math.max(0, Math.min(100, Number(row.score) || 0))}%"></span>
+          </div>
+          <b>${formatNumber(row.score)}</b>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+function renderGeneScoreResult(gene, themeRows) {
+  const top = themeRows[0] || {};
+  state.scoreMode = 'gene';
+  state.scoreRows = themeRows.map(row => ({
+    gene_id: gene.gene_id,
+    mode: 'gene',
+    theme: row.title,
+    score: row.score,
+    evidence: row.evidence.map(item => `${item.field}: ${item.terms.join('|')}`).join('; ')
+  }));
+  return `
+    <div class="score-summary">
+      <div>
+        <span class="status-pill">Gene ID 分析</span>
+        <h3><a class="gene-link" href="#gene/${encodeURIComponent(gene.gene_id)}">${escapeHtml(gene.gene_id)}</a></h3>
+        <p>${escapeHtml(displayValue(gene.functional_annotation, '暂无功能注释'))}</p>
+      </div>
+      <div class="score-big">
+        <strong>${formatNumber(top.score || 0)}</strong>
+        <span>${escapeHtml(top.title || '无明显主题')}</span>
+      </div>
+    </div>
+    <div class="compact-stats score-stats">
+      <div><strong>${escapeHtml(geneLocation(gene))}</strong><span>位置</span></div>
+      <div><strong>${escapeHtml(displayValue(gene.plantTFDB_family, '-'))}</strong><span>转录因子</span></div>
+      <div><strong>${formatNumber(listFrom(gene.go_terms).length)}</strong><span>GO</span></div>
+      <div><strong>${formatNumber(listFrom(gene.pfam_domains).length + listFrom(gene.interpro_domains).length)}</strong><span>Domain</span></div>
+    </div>
+    ${renderScoreBars(themeRows.slice(0, 8))}
+    <h4>主要证据</h4>
+    ${scoreEvidenceHtml(top.evidence || [])}
+  `;
+}
+
+function renderFunctionScoreResult(rows, query) {
+  state.scoreMode = 'function';
+  state.scoreRows = rows.map((row, index) => ({
+    rank: index + 1,
+    gene_id: row.gene.gene_id,
+    mode: 'function',
+    query,
+    score: row.score,
+    theme: row.topTheme?.title || '',
+    location: geneLocation(row.gene),
+    annotation: displayValue(row.gene.functional_annotation, ''),
+    evidence: row.evidence.map(item => `${item.field}: ${item.terms.join('|')}`).join('; ')
+  }));
+  if (!rows.length) {
+    return '<p class="empty-help">没有找到足够证据支持的候选基因。可以放宽筛选条件，或换用 GO、Pfam、KO、功能关键词。</p>';
+  }
+  return `
+    <div class="score-summary">
+      <div>
+        <span class="status-pill">功能关键词评分</span>
+        <h3>${escapeHtml(query)}</h3>
+        <p>按注释字段命中、证据类型和主题相关性排序。宽泛关键词会产生较多候选，请优先看证据列。</p>
+      </div>
+      <div class="score-big">
+        <strong>${formatNumber(rows.length)}</strong>
+        <span>候选基因</span>
+      </div>
+    </div>
+    <div class="table-wrap score-table-wrap">
+      <table class="score-table">
+        <thead>
+          <tr><th>#</th><th>Gene ID</th><th>分数</th><th>主题</th><th>位置</th><th>功能摘要</th><th>证据</th></tr>
+        </thead>
+        <tbody>
+          ${rows.map((row, index) => `
+            <tr>
+              <td data-label="#">${index + 1}</td>
+              <td data-label="Gene ID"><a class="gene-link" href="#gene/${encodeURIComponent(row.gene.gene_id)}">${escapeHtml(row.gene.gene_id)}</a></td>
+              <td data-label="分数"><strong>${formatNumber(row.score)}</strong></td>
+              <td data-label="主题">${escapeHtml(row.topTheme?.title || '-')}</td>
+              <td data-label="位置"><code>${escapeHtml(geneLocation(row.gene))}</code></td>
+              <td data-label="功能摘要">${escapeHtml(displayValue(row.gene.functional_annotation, '暂无注释'))}</td>
+              <td data-label="证据">${scoreEvidenceHtml(row.evidence)}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+async function runScoreAnalysis() {
+  const scorer = getFunctionScorer();
+  const status = qs('scoreStatus');
+  const resultsCard = qs('scoreResultsCard');
+  const results = qs('scoreResults');
+  const downloadButton = qs('scoreDownloadCsv');
+  const query = String(qs('scoreQuery')?.value || '').trim();
+  const selectedMode = qs('scoreModeSelect')?.value || 'auto';
+  if (!scorer) {
+    if (status) status.textContent = '评分规则模块未加载，请刷新页面。';
+    return;
+  }
+  if (!query) {
+    if (status) status.textContent = '请输入 Gene ID 或功能关键词。';
+    return;
+  }
+  if (status) status.textContent = '正在加载基因注释数据...';
+  await loadGenes();
+  const exact = state.geneById.get(query) || state.genes.find(gene => normalize(gene.gene_id).toLowerCase() === query.toLowerCase());
+  const mode = selectedMode === 'auto' ? (exact ? 'gene' : 'function') : selectedMode;
+  let html = '';
+  if (mode === 'gene') {
+    if (!exact) {
+      state.scoreRows = [];
+      html = '<p class="empty-help">未找到这个 Gene ID。请检查拼写，或切换为“功能关键词”模式。</p>';
+      if (status) status.textContent = 'Gene ID 未命中。';
+    } else {
+      const themeRows = scorer.scoreGeneThemes(exact);
+      html = renderGeneScoreResult(exact, themeRows);
+      if (status) status.textContent = `已完成 ${exact.gene_id} 的功能主题评分。`;
+    }
+  } else {
+    const rows = scorer.rankGenesForFunction(state.genes, query, scoreOptionsFromControls());
+    html = renderFunctionScoreResult(rows, query);
+    if (status) status.textContent = `已完成评分：返回 ${formatNumber(rows.length)} 个候选基因。`;
+  }
+  if (results) results.innerHTML = html;
+  if (resultsCard) resultsCard.hidden = false;
+  if (downloadButton) downloadButton.disabled = !state.scoreRows.length;
+}
+
+function downloadScoreCsv() {
+  if (!state.scoreRows.length) { showToast('暂无可导出的评分结果'); return; }
+  const fields = state.scoreMode === 'gene'
+    ? ['gene_id', 'mode', 'theme', 'score', 'evidence']
+    : ['rank', 'gene_id', 'mode', 'query', 'score', 'theme', 'location', 'annotation', 'evidence'];
+  const esc = (value) => `"${String(value ?? '').replace(/"/g, '""')}"`;
+  const csv = [fields.join(','), ...state.scoreRows.map(row => fields.map(field => esc(row[field])).join(','))].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `konjac_function_score_${state.scoreMode || 'results'}.csv`;
+  link.click();
+  URL.revokeObjectURL(url);
+  showToast('评分 CSV 已开始下载');
+}
+
 function renderBlastContent() {
   const host = qs('blastContent');
   if (!host) return;
-  const cdsSize = formatBytes(49918089);
-  const pepSize = formatBytes(17583227);
   host.innerHTML = `
     <article class="card full blast-card blast-online-card">
       <div class="blast-card-head">
         <div>
           <h3>在线 BLAST 队列</h3>
-          <p class="help-note">提交 BLAST 需要登录；Supabase 记录任务状态，本机 worker 执行 BLAST 并回写结果。</p>
+          <p class="help-note">选择程序、数据库和参数后提交；任务完成后可在下方查看命中结果。</p>
         </div>
-        <span class="status-pill">Supabase Auth</span>
+        <span class="status-pill">登录提交</span>
       </div>
       <div id="blastAuthPanel" class="blast-auth-panel"></div>
-      <form id="blastOnlineForm" class="blast-form">
-        <label>
-          <span>搜索库</span>
-          <select id="blastProgram">
-            <option value="konjac_cds" data-program="blastn">blastn against CDS</option>
-            <option value="konjac_pep" data-program="blastp">blastp against protein</option>
-            <option value="konjac_genome" data-program="blastn">blastn against genome</option>
-          </select>
-        </label>
-        <label>
-          <span>最大命中数</span>
-          <input id="blastMaxTargets" type="number" min="1" max="50" value="50">
-        </label>
-        <label class="blast-sequence-field">
-          <span>查询序列</span>
-          <textarea id="blastSequence" rows="8" spellcheck="false" placeholder=">query&#10;ATGG..."></textarea>
-        </label>
+      <div class="blast-program-tabs" aria-label="BLAST 程序快捷选择">
+        <button class="blast-program-tab active" type="button" data-blast-program-tab="blastn">blastn</button>
+        <button class="blast-program-tab" type="button" data-blast-program-tab="blastp">blastp</button>
+        <button class="blast-program-tab" type="button" data-blast-program-tab="blastx">blastx</button>
+        <button class="blast-program-tab" type="button" data-blast-program-tab="tblastn">tblastn</button>
+        <button class="blast-program-tab" type="button" data-blast-program-tab="tblastx">tblastx</button>
+      </div>
+      <form id="blastOnlineForm" class="blast-form blast-ncbi-form">
+        <section class="blast-form-section">
+          <h4>选择 BLAST 程序</h4>
+          <label>
+            <span>程序 / 数据库</span>
+            <select id="blastProgram">
+              <option value="konjac_cds" data-program="blastn">花魔芋 CDS · blastn</option>
+              <option value="konjac_genome" data-program="blastn">花魔芋 genome · blastn</option>
+              <option value="konjac_pep" data-program="blastp">花魔芋 protein · blastp</option>
+              <option value="konjac_pep" data-program="blastx">花魔芋 protein · blastx</option>
+              <option value="konjac_cds" data-program="tblastn">花魔芋 CDS · tblastn</option>
+              <option value="konjac_genome" data-program="tblastn">花魔芋 genome · tblastn</option>
+              <option value="konjac_cds" data-program="tblastx">花魔芋 CDS · tblastx</option>
+              <option value="konjac_genome" data-program="tblastx">花魔芋 genome · tblastx</option>
+            </select>
+          </label>
+        </section>
+        <section class="blast-form-section blast-query-section">
+          <h4>输入查询序列</h4>
+          <label class="blast-sequence-field">
+            <span>FASTA 或纯序列</span>
+            <textarea id="blastSequence" rows="8" spellcheck="false" placeholder=">query&#10;ATGG..."></textarea>
+          </label>
+          <div class="blast-examples">
+            <button class="mini-link" type="button" data-blast-example="cds">填入 CDS 示例</button>
+            <button class="mini-link" type="button" data-blast-example="protein">填入 protein 示例</button>
+          </div>
+          <div class="blast-inline-grid">
+            <label class="blast-upload-field">
+              <span>上传 FASTA 文件</span>
+              <input id="blastFileInput" type="file" accept=".fa,.fasta,.faa,.fna,.txt">
+            </label>
+            <label>
+              <span>任务标题</span>
+              <input id="blastJobTitle" type="text" maxlength="120" placeholder="可选">
+            </label>
+            <label>
+              <span>查询起点</span>
+              <input id="blastQueryFrom" type="number" min="1" placeholder="可选">
+            </label>
+            <label>
+              <span>查询终点</span>
+              <input id="blastQueryTo" type="number" min="1" placeholder="可选">
+            </label>
+          </div>
+        </section>
+        <section class="blast-form-section">
+          <h4>选择搜索数据库</h4>
+          <div class="blast-inline-grid">
+            <label>
+              <span>数据库</span>
+              <select id="blastDatabaseMirror" disabled>
+                <option>花魔芋数据库随程序自动选择</option>
+              </select>
+            </label>
+            <label>
+              <span>物种</span>
+              <input type="text" value="Amorphophallus konjac" disabled>
+            </label>
+            <label>
+              <span>遗传密码表</span>
+              <select id="blastGeneticCode">
+                <option value="1" selected>Standard (1)</option>
+                <option value="2">Vertebrate mitochondrial (2)</option>
+                <option value="5">Invertebrate mitochondrial (5)</option>
+                <option value="11">Bacterial / plastid (11)</option>
+              </select>
+            </label>
+            <label>
+              <span>最大命中数</span>
+              <input id="blastMaxTargets" type="number" min="1" max="50" value="50">
+            </label>
+          </div>
+        </section>
+        <section class="blast-form-section">
+          <h4>算法参数</h4>
+          <div class="blast-inline-grid">
+            <label>
+              <span>E-value</span>
+              <select id="blastEvalue">
+                <option value="10">10</option>
+                <option value="1">1</option>
+                <option value="1e-3">1e-3</option>
+                <option value="1e-5" selected>1e-5</option>
+                <option value="1e-10">1e-10</option>
+              </select>
+            </label>
+            <label>
+              <span>任务</span>
+              <select id="blastTask"></select>
+            </label>
+            <label>
+              <span>Word size</span>
+              <input id="blastWordSize" type="number" min="2" max="64" value="">
+            </label>
+            <label>
+              <span>Matrix</span>
+              <select id="blastMatrix">
+                <option value="BLOSUM62" selected>BLOSUM62</option>
+                <option value="BLOSUM45">BLOSUM45</option>
+                <option value="BLOSUM80">BLOSUM80</option>
+                <option value="PAM30">PAM30</option>
+                <option value="PAM70">PAM70</option>
+              </select>
+            </label>
+            <label>
+              <span>低复杂度过滤</span>
+              <select id="blastFilter">
+                <option value="true" selected>开启</option>
+                <option value="false">关闭</option>
+              </select>
+            </label>
+          </div>
+        </section>
         <div class="blast-actions">
-          <button class="button" type="submit">提交 BLAST</button>
+          <button class="button" type="submit">BLAST</button>
           <button class="button ghost" id="blastCheckLast" type="button">刷新上次任务</button>
           <span id="blastDatabaseHint" class="status-pill">数据库：konjac_cds</span>
         </div>
       </form>
       <div id="blastOnlineStatus" class="blast-online-status"></div>
     </article>
-    <article class="card full blast-card blast-status-card">
-      <h3>本地 BLAST 状态</h3>
-      <div id="blastManifestStatus" class="blast-status-list">
-        <span class="status-pill">正在检查 blastdb/manifest.json...</span>
-      </div>
-      <p class="help-note">当前网站仍是静态前端；BLAST 计算由本机 PowerShell worker 完成，任务状态写入 Supabase。</p>
+    <article class="card blast-card">
+      <h3>支持的 BLAST 程序</h3>
+      <p>当前支持 <code>blastn</code>、<code>blastp</code>、<code>blastx</code>、<code>tblastn</code> 和 <code>tblastx</code>。</p>
+      <p class="help-note">核酸查询可用于 blastn、blastx、tblastx；蛋白查询可用于 blastp、tblastn。</p>
     </article>
     <article class="card blast-card">
-      <h3>已准备的软件</h3>
+      <h3>搜索数据库</h3>
       <dl class="detail-dl">
-        <dt>BLAST+ 路径</dt><dd><code>C:/Program Files/NCBI/blast-2.9.0+/bin</code></dd>
-        <dt>工具</dt><dd><code>makeblastdb.exe</code>、<code>blastn.exe</code>、<code>blastp.exe</code></dd>
-        <dt>检查命令</dt><dd><code>blastn -version</code></dd>
+        <dt>CDS</dt><dd>花魔芋编码序列数据库</dd>
+        <dt>Protein</dt><dd>花魔芋蛋白序列数据库</dd>
+        <dt>Genome</dt><dd>花魔芋基因组序列数据库</dd>
       </dl>
     </article>
     <article class="card blast-card">
-      <h3>输入文件</h3>
-      <dl class="detail-dl">
-        <dt>CDS FASTA</dt><dd><code>downloads/Amorphophallus_konjac.clean.cds</code> (${cdsSize})</dd>
-        <dt>Protein FASTA</dt><dd><code>downloads/Amorphophallus_konjac.clean.pep</code> (${pepSize})</dd>
-        <dt>示例查询</dt><dd><code>examples/blast/query_cds.fa</code><br><code>examples/blast/query_protein.fa</code></dd>
-      </dl>
-    </article>
-    <article class="card blast-card">
-      <h3>一键建库</h3>
-      <pre><code>Set-Location "&lt;project-root&gt;"
-./scripts/build-blast-db.ps1</code></pre>
-      <p>默认生成 <code>konjac_cds</code> 和 <code>konjac_pep</code>；需要 genome 时运行 <code>./scripts/build-blast-db.ps1 -IncludeGenome</code>。</p>
-    </article>
-    <article class="card blast-card">
-      <h3>运行示例查询</h3>
-      <pre><code>Set-Location "&lt;project-root&gt;"
-./scripts/run-blast-examples.ps1</code></pre>
-      <p>输出 <code>blast_results/example_cds.tsv</code> 和 <code>blast_results/example_pep.tsv</code>。</p>
-    </article>
-    <article class="card blast-card">
-      <h3>启动 Supabase worker</h3>
-      <pre><code>Set-Location "&lt;project-root&gt;"
-$env:SUPABASE_URL="https://plvylqvdlavriupvphxj.supabase.co"
-$env:SUPABASE_SERVICE_ROLE_KEY="..."
-./scripts/run-supabase-blast-worker.ps1</code></pre>
-      <p>worker 会读取 <code>queued</code> 任务，运行本地 BLAST+，并把命中结果写回 Supabase。</p>
-    </article>
-    <article class="card blast-card">
-      <h3>手动 blastn</h3>
-      <pre><code>blastn -query examples/blast/query_cds.fa -db blastdb/konjac_cds -out blast_results/my_cds.tsv -outfmt "6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore" -max_target_seqs 50</code></pre>
-    </article>
-    <article class="card blast-card">
-      <h3>手动 genome blastn</h3>
-      <pre><code>blastn -query examples/blast/query_cds.fa -db blastdb/konjac_genome -out blast_results/my_genome.tsv -outfmt "6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore" -max_target_seqs 25</code></pre>
-    </article>
-    <article class="card blast-card">
-      <h3>手动 blastp</h3>
-      <pre><code>blastp -query examples/blast/query_protein.fa -db blastdb/konjac_pep -out blast_results/my_pep.tsv -outfmt "6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore" -max_target_seqs 50</code></pre>
+      <h3>结果跳转</h3>
+      <p>命中 CDS 或蛋白条目时，Subject 可进入对应基因详情页。</p>
+      <p class="help-note">命中基因组区域时，结果会跳转到基因组浏览器查看附近坐标。</p>
     </article>
     <article class="card full blast-card">
-      <h3>输出字段</h3>
-      <p><code>outfmt 6</code> 字段依次为：query ID、subject ID、identity、alignment length、mismatch、gap open、query start/end、subject start/end、E-value、bitscore。</p>
-      <p class="help-note">在线提交只负责任务排队和状态查看；本机 worker 没运行时，任务会停留在 queued。</p>
+      <h3>结果字段</h3>
+      <p>结果表展示 Subject、Identity、Length、E-value 和 Bitscore，用于快速判断相似性和命中可靠性。</p>
     </article>
   `;
   bindBlastOnlineForm();
   bindBlastAuthPanel();
   void hydrateBlastAuthPanel();
   void restoreLastBlastJob();
-  void hydrateBlastManifest();
-}
-
-async function hydrateBlastManifest() {
-  const host = qs('blastManifestStatus');
-  if (!host) return;
-  try {
-    const res = await fetch('./blastdb/manifest.json', { cache: 'no-store' });
-    if (!res.ok) throw new Error('manifest missing');
-    const manifest = await res.json();
-    const databases = Array.isArray(manifest.databases) ? manifest.databases : [];
-    const dbHtml = databases.map(db => {
-      const files = Array.isArray(db.files) ? db.files : [];
-      const bytes = files.reduce((sum, file) => sum + (Number(file.bytes) || 0), 0);
-      return `<span class="status-pill ok">${escapeHtml(db.id || db.prefix || 'database')} · ${escapeHtml(db.dbtype || '')} · ${files.length} files · ${formatBytes(bytes)}</span>`;
-    }).join('');
-    host.innerHTML = `
-      <span class="status-pill ok">数据库已生成</span>
-      <span class="status-pill">${escapeHtml(manifest.blast_version || 'BLAST+')}</span>
-      <span class="status-pill">Built: ${escapeHtml(manifest.built_at || 'unknown')}</span>
-      ${dbHtml}
-    `;
-  } catch (error) {
-    host.innerHTML = `
-      <span class="status-pill warning">数据库尚未生成</span>
-      <span class="status-pill">运行 scripts\\build-blast-db.ps1 后会生成 blastdb/manifest.json</span>
-    `;
-  }
 }
 
 function getBlastSelection() {
   const select = qs('blastProgram');
   const option = select?.selectedOptions?.[0];
-  const database = select?.value || 'konjac_cds';
+  const database = option?.value || select?.value || 'konjac_cds';
   const program = option?.dataset?.program || (database === 'konjac_pep' ? 'blastp' : 'blastn');
   return { program, database };
 }
 
+function selectBlastProgram(programName = 'blastn') {
+  const select = qs('blastProgram');
+  if (!select) return;
+  const options = Array.from(select.options);
+  const index = options.findIndex(option => option.dataset.program === programName);
+  if (index >= 0) select.selectedIndex = index;
+  updateBlastDatabaseHint();
+}
+
 function updateBlastDatabaseHint() {
-  const { database } = getBlastSelection();
+  const { program, database } = getBlastSelection();
   const hint = qs('blastDatabaseHint');
   if (hint) hint.textContent = `数据库：${database}`;
+  $$('.blast-program-tab').forEach((button) => {
+    button.classList.toggle('active', button.getAttribute('data-blast-program-tab') === program);
+  });
   const maxTargets = qs('blastMaxTargets');
   if (maxTargets) {
     maxTargets.max = database === 'konjac_genome' ? '25' : '50';
     if (Number(maxTargets.value || 50) > Number(maxTargets.max)) maxTargets.value = maxTargets.max;
   }
+  const task = qs('blastTask');
+  if (task) {
+    const current = task.value;
+    let taskOptions = [['megablast', 'megablast'], ['blastn', 'blastn'], ['blastn-short', 'blastn-short'], ['dc-megablast', 'discontiguous megablast']];
+    if (program === 'blastp') taskOptions = [['blastp', 'blastp'], ['blastp-short', 'blastp-short']];
+    if (program === 'blastx') taskOptions = [['blastx', 'blastx'], ['blastx-fast', 'blastx-fast']];
+    if (program === 'tblastn') taskOptions = [['tblastn', 'tblastn'], ['tblastn-fast', 'tblastn-fast']];
+    if (program === 'tblastx') taskOptions = [['tblastx', 'tblastx']];
+    task.innerHTML = taskOptions.map(([value, label]) => `<option value="${escapeHtml(value)}">${escapeHtml(label)}</option>`).join('');
+    task.value = taskOptions.some(([value]) => value === current) ? current : taskOptions[0][0];
+  }
+  const matrix = qs('blastMatrix');
+  if (matrix) matrix.disabled = !['blastp', 'blastx', 'tblastn', 'tblastx'].includes(program);
+  const geneticCode = qs('blastGeneticCode');
+  if (geneticCode) geneticCode.disabled = !['blastx', 'tblastn', 'tblastx'].includes(program);
+  const wordSize = qs('blastWordSize');
+  if (wordSize && !wordSize.value) {
+    wordSize.placeholder = ['blastp', 'blastx', 'tblastn', 'tblastx'].includes(program)
+      ? '默认 3'
+      : database === 'konjac_genome' ? '默认 28' : '默认 11';
+  }
   const sequence = qs('blastSequence');
   if (sequence) {
-    sequence.placeholder = database === 'konjac_genome'
-      ? '>query\nATGG...（genome blastn 建议 <= 10,000 bp）'
-      : '>query\nATGG...';
+    sequence.placeholder = ['blastp', 'tblastn'].includes(program)
+      ? '>protein_query\nMSE...（蛋白序列，建议 <= 20,000 aa）'
+      : database === 'konjac_genome'
+        ? '>nucleotide_query\nATGG...（genome blastn 建议 <= 10,000 bp）'
+        : '>nucleotide_query\nATGG...（核酸序列，建议 <= 20,000 bp）';
   }
 }
 
@@ -1014,7 +1754,7 @@ async function supabaseAuthRequest(path, body = null, accessToken = '') {
   const res = await fetch(`${SUPABASE_URL}/auth/v1/${path}`, options);
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    throw new Error(data.error_description || data.msg || data.message || data.error || `Supabase Auth HTTP ${res.status}`);
+    throw new Error(data.error_description || data.msg || data.message || data.error || `登录服务 HTTP ${res.status}`);
   }
   return data;
 }
@@ -1022,10 +1762,10 @@ async function supabaseAuthRequest(path, body = null, accessToken = '') {
 function friendlyAuthError(error) {
   const message = error?.message ? String(error.message) : '';
   if (/invalid login credentials/i.test(message)) return '邮箱或密码不正确。如果还没有账号，请先输入邮箱和密码后点击注册。';
-  if (/signup|signups.*disabled|not allowed/i.test(message)) return '当前 Supabase 项目未允许邮箱注册，请先在 Supabase Auth 设置里启用 Email/Password 注册。';
+  if (/signup|signups.*disabled|not allowed/i.test(message)) return '当前登录服务暂未允许新用户注册，请联系网站维护者开通账号。';
   if (/password/i.test(message) && /six|6|weak|short/i.test(message)) return '密码太短，请使用至少 6 位密码。';
   if (/email/i.test(message) && /invalid/i.test(message)) return '邮箱格式不正确。';
-  return message || 'Supabase Auth 请求失败，请稍后重试。';
+  return message || '登录服务请求失败，请稍后重试。';
 }
 
 async function ensureAuthSession() {
@@ -1078,13 +1818,13 @@ async function hydrateBlastAuthPanel(message = '') {
   const session = await ensureAuthSession();
   const messageHtml = message ? `<p class="blast-auth-message">${escapeHtml(message)}</p>` : '';
   if (session?.access_token) {
-    const email = session.user?.email || 'Supabase user';
+    const email = session.user?.email || '已登录用户';
     host.innerHTML = `
       <div class="blast-auth-box signed-in">
         <div>
           <strong>已登录</strong>
           <span>${escapeHtml(email)}</span>
-          <small>只有提交 BLAST 需要登录；状态刷新使用任务 token。</small>
+          <small>只有提交 BLAST 需要登录；任务完成后可继续刷新查看结果。</small>
         </div>
         <div class="blast-auth-actions">
           <button class="button ghost small" type="button" data-auth-action="logout">退出登录</button>
@@ -1157,6 +1897,15 @@ function bindBlastOnlineForm() {
   const checkLast = qs('blastCheckLast');
   if (!form) return;
   program?.addEventListener('change', updateBlastDatabaseHint);
+  $$('.blast-program-tab').forEach((button) => {
+    button.addEventListener('click', () => {
+      selectBlastProgram(button.getAttribute('data-blast-program-tab') || 'blastn');
+    });
+  });
+  $$('[data-blast-example]').forEach((button) => {
+    button.addEventListener('click', () => fillBlastExample(button.getAttribute('data-blast-example') || 'cds'));
+  });
+  qs('blastFileInput')?.addEventListener('change', readBlastUploadFile);
   form.addEventListener('submit', submitOnlineBlast);
   checkLast?.addEventListener('click', () => {
     const record = readLastBlastJob();
@@ -1167,6 +1916,34 @@ function bindBlastOnlineForm() {
     }
   });
   updateBlastDatabaseHint();
+}
+
+function fillBlastExample(type = 'cds') {
+  const select = qs('blastProgram');
+  const textarea = qs('blastSequence');
+  if (!textarea) return;
+  if (type === 'protein') {
+    if (select) selectBlastProgram('blastp');
+    textarea.value = '>example_protein\nMAVVEKNSVLKQDFLQKLEKQGIDPKQAVAA';
+  } else {
+    if (select && getBlastSelection().program === 'blastp') selectBlastProgram('blastn');
+    textarea.value = '>example_cds\nATGGCTGTGGTGGAGAAGAATTCTGTTCTCAAGCAAGACTTCCTCCAGAAGCTTGAGAAG';
+  }
+  updateBlastDatabaseHint();
+}
+
+async function readBlastUploadFile(event) {
+  const input = event.target instanceof HTMLInputElement ? event.target : null;
+  const file = input?.files?.[0];
+  if (!file) return;
+  if (file.size > 2 * 1024 * 1024) {
+    renderBlastOnlineStatus('<p class="download-warning">上传 FASTA 文件请控制在 2 MB 以内。</p>');
+    input.value = '';
+    return;
+  }
+  const text = await file.text();
+  const textarea = qs('blastSequence');
+  if (textarea) textarea.value = text;
 }
 
 function readLastBlastJob() {
@@ -1204,11 +1981,11 @@ function validateBlastSequenceInput(value, program, database = '') {
   if (sequence.length > maxLength) throw new Error(`查询序列不能超过 ${formatNumber(maxLength)} bp/aa。`);
   const validNucleotide = /^[ACGTRYSWKMBDHVN.-]+$/i;
   const validProtein = /^[ABCDEFGHIKLMNPQRSTVWXYZ*.-]+$/i;
-  if (program === 'blastn' && !validNucleotide.test(sequence)) {
-    throw new Error('blastn 只接受核酸序列字符。');
+  if (['blastn', 'blastx', 'tblastx'].includes(program) && !validNucleotide.test(sequence)) {
+    throw new Error(`${program} 只接受核酸序列字符。`);
   }
-  if (program === 'blastp' && !validProtein.test(sequence)) {
-    throw new Error('blastp 只接受蛋白序列字符。');
+  if (['blastp', 'tblastn'].includes(program) && !validProtein.test(sequence)) {
+    throw new Error(`${program} 只接受蛋白序列字符。`);
   }
   return sequence.length;
 }
@@ -1224,12 +2001,21 @@ async function submitOnlineBlast(event) {
   const sequence = qs('blastSequence')?.value || '';
   const maxTargetLimit = database === 'konjac_genome' ? 25 : 50;
   const maxTargetSeqs = Math.max(1, Math.min(maxTargetLimit, Number(qs('blastMaxTargets')?.value || maxTargetLimit)));
+  const evalue = qs('blastEvalue')?.value || '1e-5';
+  const task = qs('blastTask')?.value || '';
+  const wordSize = Number(qs('blastWordSize')?.value || 0) || null;
+  const matrix = qs('blastMatrix')?.value || '';
+  const filterLowComplexity = (qs('blastFilter')?.value || 'true') === 'true';
+  const geneticCode = Number(qs('blastGeneticCode')?.value || 1) || 1;
+  const queryFrom = Number(qs('blastQueryFrom')?.value || 0) || null;
+  const queryTo = Number(qs('blastQueryTo')?.value || 0) || null;
+  const jobTitle = String(qs('blastJobTitle')?.value || '').trim();
   try {
     const queryLength = validateBlastSequenceInput(sequence, program, database);
     const session = await ensureAuthSession();
     if (!session?.access_token) {
       await hydrateBlastAuthPanel('请先登录后再提交 BLAST。');
-      renderBlastOnlineStatus('<p class="download-warning">BLAST 提交需要 Supabase 登录；其他页面仍可直接浏览。</p>');
+      renderBlastOnlineStatus('<p class="download-warning">BLAST 提交需要先登录；其他页面仍可直接浏览。</p>');
       return;
     }
     renderBlastOnlineStatus(`<p class="help-note">正在提交 ${escapeHtml(program)} / ${escapeHtml(database)} 查询，长度 ${formatNumber(queryLength)}...</p>`);
@@ -1245,7 +2031,16 @@ async function submitOnlineBlast(event) {
         program,
         database,
         sequence,
-        max_target_seqs: maxTargetSeqs
+        max_target_seqs: maxTargetSeqs,
+        evalue,
+        task,
+        word_size: wordSize,
+        matrix,
+        filter_low_complexity: filterLowComplexity,
+        genetic_code: geneticCode,
+        query_from: queryFrom,
+        query_to: queryTo,
+        job_title: jobTitle
       })
     });
     const data = await res.json().catch(() => ({}));
@@ -1322,15 +2117,24 @@ function renderBlastSubjectLink(hit, database = '') {
 function renderBlastJobResult(data) {
   const job = data.job || {};
   const hits = Array.isArray(data.hits) ? data.hits : [];
+  state.lastBlastResult = { job, hits };
   const status = job.status || 'queued';
   const created = job.created_at ? new Date(job.created_at).toLocaleString() : 'unknown';
   const finished = job.finished_at ? new Date(job.finished_at).toLocaleString() : '';
+  const coord = (start, end) => {
+    const a = Number(start);
+    const b = Number(end);
+    if (!Number.isFinite(a) || !Number.isFinite(b)) return '-';
+    return `${formatNumber(a)}-${formatNumber(b)}`;
+  };
   const rows = hits.map(hit => `
     <tr>
       <td data-label="#">${escapeHtml(hit.rank)}</td>
       <td data-label="Subject">${renderBlastSubjectLink(hit, job.database)}</td>
       <td data-label="Identity">${escapeHtml(hit.pident)}</td>
       <td data-label="Length">${escapeHtml(hit.alignment_length)}</td>
+      <td data-label="Query">${escapeHtml(coord(hit.qstart, hit.qend))}</td>
+      <td data-label="Subject pos">${escapeHtml(coord(hit.sstart, hit.send))}</td>
       <td data-label="E-value">${escapeHtml(hit.evalue)}</td>
       <td data-label="Bitscore">${escapeHtml(hit.bitscore)}</td>
     </tr>
@@ -1342,22 +2146,57 @@ function renderBlastJobResult(data) {
         <span class="status-pill">任务：${escapeHtml(job.id || '')}</span>
         <span class="status-pill">${escapeHtml(job.program || '')} · ${escapeHtml(job.database || '')}</span>
         <span class="status-pill">长度：${formatNumber(job.query_length || 0)}</span>
+        ${job.evalue ? `<span class="status-pill">E-value：${escapeHtml(job.evalue)}</span>` : ''}
+        ${job.task ? `<span class="status-pill">Task：${escapeHtml(job.task)}</span>` : ''}
+        ${job.word_size ? `<span class="status-pill">Word：${escapeHtml(job.word_size)}</span>` : ''}
+        ${job.matrix ? `<span class="status-pill">Matrix：${escapeHtml(job.matrix)}</span>` : ''}
+        ${job.genetic_code ? `<span class="status-pill">Genetic code：${escapeHtml(job.genetic_code)}</span>` : ''}
+        ${job.query_from && job.query_to ? `<span class="status-pill">Query：${formatNumber(job.query_from)}-${formatNumber(job.query_to)}</span>` : ''}
+        <span class="status-pill">Filter：${job.filter_low_complexity === false ? 'off' : 'on'}</span>
         <span class="status-pill">提交：${escapeHtml(created)}</span>
         ${finished ? `<span class="status-pill">完成：${escapeHtml(finished)}</span>` : ''}
       </div>
+      ${job.job_title ? `<p class="help-note">Job title：${escapeHtml(job.job_title)}</p>` : ''}
       ${job.error_message ? `<p class="download-warning">${escapeHtml(job.error_message)}</p>` : ''}
       ${hits.length ? `
+        <div class="blast-result-actions">
+          <button class="button ghost small" type="button" data-action="download-blast-tsv">下载结果 TSV</button>
+        </div>
         <div class="table-wrap blast-result-wrap">
           <table>
             <thead>
-              <tr><th>#</th><th>Subject</th><th>Identity</th><th>Length</th><th>E-value</th><th>Bitscore</th></tr>
+              <tr><th>#</th><th>Subject</th><th>Identity</th><th>Length</th><th>Query</th><th>Subject pos</th><th>E-value</th><th>Bitscore</th></tr>
             </thead>
             <tbody>${rows}</tbody>
           </table>
         </div>
-      ` : `<p class="help-note">${status === 'queued' || status === 'running' ? '等待后台 worker 写入结果。' : '暂无命中结果。'}</p>`}
+      ` : `<p class="help-note">${status === 'queued' || status === 'running' ? '等待后台计算服务写入结果。' : '暂无命中结果。'}</p>`}
     </div>
   `);
+}
+
+function downloadBlastTsv() {
+  const result = state.lastBlastResult;
+  const hits = Array.isArray(result?.hits) ? result.hits : [];
+  const job = result?.job || {};
+  if (!hits.length) {
+    showToast('暂无可下载的 BLAST 结果');
+    return;
+  }
+  const fields = ['rank', 'qseqid', 'sseqid', 'pident', 'alignment_length', 'mismatch', 'gapopen', 'qstart', 'qend', 'sstart', 'send', 'evalue', 'bitscore'];
+  const lines = [
+    fields.join('\t'),
+    ...hits.map(hit => fields.map(field => String(hit?.[field] ?? '')).join('\t'))
+  ];
+  const blob = new Blob([`${lines.join('\n')}\n`], { type: 'text/tab-separated-values;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  const jobId = String(job.id || 'blast').slice(0, 12);
+  link.href = url;
+  link.download = `konjac_${job.program || 'blast'}_${jobId}.tsv`;
+  link.click();
+  URL.revokeObjectURL(url);
+  showToast('BLAST TSV 已开始下载');
 }
 
 function parseFastaToMap(text) {
@@ -1774,7 +2613,7 @@ function renderGeneDetail(gene, overlayState = 'loading') {
       ${renderDetailCard('同源命中', [
         ['目标物种', renderFallback(gene.target_species)],
         ['目标家族', renderFallback(gene.target_family)],
-        ['Identity', gene.sequence_identity ? `${escapeHtml(displayValue(gene.sequence_identity))}%` : '<span class="muted">鏆傛棤娉ㄩ噴</span>'],
+        ['Identity', gene.sequence_identity ? `${escapeHtml(displayValue(gene.sequence_identity))}%` : '<span class="muted">暂无注释</span>'],
         ['E-value', renderFallback(gene.e_value)],
         ['Bitscore', renderFallback(gene.bitscore)],
         ['Related genes', renderRelatedGenes(gene)]
@@ -1847,6 +2686,9 @@ function renderResults(rows) {
   const fragment = document.createDocumentFragment();
   shown.forEach((gene) => {
     const tr = document.createElement('tr');
+    const geneDisplay = getGeneDisplay();
+    const symbolLabel = geneDisplay.getGeneSymbolLabel(gene);
+    const displayName = geneDisplay.getGeneDisplayName(gene);
     tr.innerHTML = `
       <td data-label="Gene ID">
         <a class="gene-link" href="${buildHash('gene', gene.gene_id)}">${highlightText(gene.gene_id)}</a>
@@ -1855,7 +2697,11 @@ function renderResults(rows) {
           <button class="mini-link" data-search="${escapeHtml(gene.gene_id)}">搜索</button>
         </div>
       </td>
-      <td data-label="Symbol">${highlightText(gene.gene_symbol)}<br>${renderTagList(gene.aliases, 3)}</td>
+      <td data-label="Gene name">
+        ${symbolLabel ? `<strong class="result-gene-symbol">${highlightText(symbolLabel)}</strong>` : ''}
+        <span class="result-gene-name">${highlightText(displayName, 120)}</span>
+        ${renderTagList(gene.aliases, 3)}
+      </td>
       <td data-label="Location">${highlightText(geneLocation(gene))}<br><span class="muted">${escapeHtml(displayValue(gene.species))}</span></td>
       <td data-label="Function">${highlightText(gene.functional_annotation, 220)}</td>
       <td data-label="Evidence"><div class="evidence-list">${evidenceBadges(gene)}</div></td>
@@ -1903,9 +2749,15 @@ function renderSearchPrompt(show = true) {
 
 function renderEmptyHelp() {
   const suggestions = ['KGM', 'CSLA', 'WRKY', 'PF00069', 'GO:0003677', 'glucomannan', 'cellulose synthase', 'glycosyltransferase'];
+  const species = qs('speciesFilter')?.value || '';
+  const speciesInfo = SPECIES_OPTIONS.find(item => item.value === species);
+  const speciesNote = speciesInfo && !speciesInfo.catalog
+    ? `<p class="download-warning">${escapeHtml(speciesDataNote(species))}</p>`
+    : '';
   qs('emptyHelp').hidden = false;
   qs('emptyHelp').innerHTML = `
     <p class="muted">未找到结果。</p>
+    ${speciesNote}
     <strong>推荐关键词</strong>
     <div class="tag-list">${suggestions.map(s => `<button class="tag tag-button" data-search="${escapeHtml(s)}">${escapeHtml(s)}</button>`).join('')}</div>
   `;
@@ -1922,7 +2774,10 @@ function buildSearchChips(totalRows, totalPages) {
   if (query) pills.push(`关键词：${query}`);
   if (topic) pills.push(`专题：${topic.title}`);
   if (fieldMode !== 'all') pills.push(`字段：${qs('fieldFilter')?.selectedOptions?.[0]?.textContent || fieldMode}`);
-  if (species) pills.push(`物种：${species}`);
+  if (species) {
+    pills.push(`物种：${speciesLabel(species)}`);
+    pills.push(`数据状态：${speciesStatus(species)}`);
+  }
   if (annotation) pills.push(`注释：${qs('annotationFilter')?.selectedOptions?.[0]?.textContent || annotation}`);
   if (sortMode !== 'relevance') pills.push(`排序：${qs('sortMode')?.selectedOptions?.[0]?.textContent || sortMode}`);
   pills.push(`每页：${qs('pageSize')?.selectedOptions?.[0]?.textContent || '100'}`);
@@ -2067,8 +2922,9 @@ function evidenceBadges(gene) {
 }
 
 function renderStaticRoute(view) {
+  const preserveScroll = state.currentRoute === view;
   state.currentRoute = view;
-  showView(view);
+  showView(view, { resetScroll: !preserveScroll });
 }
 
 function renderHome() {
@@ -2089,18 +2945,21 @@ function renderSearchPromptAndPanel(show = true) {
 
 async function runSearch(query, options = {}) {
   const startedAt = performance.now();
+  const scoped = extractSpeciesScopedQuery(query);
+  const searchQuery = scoped.query;
+  if (scoped.speciesFilter) setSpeciesFilterValue(scoped.speciesFilter);
   setLoadingState('正在搜索...', null, true, false);
   await loadGenes();
   const workerReady = await ensureSearchWorker();
   if (workerReady) {
     try {
-      const response = await searchInWorker(query);
+      const response = await searchInWorker(searchQuery);
       if (response) {
         if (response.requestId !== state.searchRequestId) return;
         const rows = (response.ids || []).map(id => state.geneById.get(id)).filter(Boolean);
         state.filtered = rows;
-        state.lastTokens = Array.isArray(response.tokens) ? response.tokens : String(query || '').toLowerCase().split(/\s+/).filter(Boolean);
-        state.lastGroups = Array.isArray(response.groups) ? response.groups : buildQueryGroups(query);
+        state.lastTokens = Array.isArray(response.tokens) ? response.tokens : String(searchQuery || '').toLowerCase().split(/\s+/).filter(Boolean);
+        state.lastGroups = Array.isArray(response.groups) ? response.groups : buildQueryGroups(searchQuery);
         state.lastSearchDuration = Number(response.elapsedMs) || (performance.now() - startedAt);
         qs('loadStatus').hidden = true;
         renderQueryHint();
@@ -2116,10 +2975,10 @@ async function runSearch(query, options = {}) {
     }
   }
   const fieldMode = qs('fieldFilter')?.value || 'all';
-  const speciesFilter = qs('speciesFilter')?.value || '';
+  const speciesFilter = scoped.speciesFilter || qs('speciesFilter')?.value || '';
   const annotationFilter = qs('annotationFilter')?.value || '';
   const sortMode = qs('sortMode')?.value || 'relevance';
-  const groups = buildQueryGroups(query);
+  const groups = buildQueryGroups(searchQuery);
   let rows = state.genes.filter(gene => {
     const fieldText = getFieldText(gene, fieldMode);
     if (!matchesGroups(fieldText, groups)) return false;
@@ -2133,7 +2992,7 @@ async function runSearch(query, options = {}) {
   });
   rows = sortRows(rows, sortMode, groups, fieldMode);
   state.filtered = rows;
-  state.lastTokens = query.toLowerCase().split(/\s+/).filter(Boolean);
+  state.lastTokens = searchQuery.toLowerCase().split(/\s+/).filter(Boolean);
   state.lastGroups = groups;
   state.lastSearchDuration = performance.now() - startedAt;
   qs('loadStatus').hidden = true;
@@ -2147,17 +3006,20 @@ async function runSearch(query, options = {}) {
 
 function renderSearchRoute(route) {
   showView('search');
-  syncSearchInputs(route.query || state.submittedQuery || '');
-  if (!route.query && !state.submittedQuery) {
+  const scoped = extractSpeciesScopedQuery(route.query || state.submittedQuery || '');
+  const routeQuery = scoped.query;
+  if (scoped.speciesFilter) setSpeciesFilterValue(scoped.speciesFilter);
+  syncSearchInputs(routeQuery);
+  if (!routeQuery && !state.submittedQuery) {
     renderSearchPrompt(true);
     qs('resultsPanel').hidden = true;
     renderSearchStatus({});
     return;
   }
-  if (route.query && route.query !== state.submittedQuery) state.submittedQuery = route.query;
+  if (routeQuery && routeQuery !== state.submittedQuery) state.submittedQuery = routeQuery;
   const saved = readSearchState();
   if (saved && saved.hash === window.location.hash) restoreSearchState(saved);
-  void runSearch(state.submittedQuery || route.query || '');
+  void runSearch(state.submittedQuery || routeQuery || '');
 }
 
 function renderGeneRoute(route) {
@@ -2206,34 +3068,8 @@ function parseHashRoute(hash = window.location.hash || '#/') {
   const params = new URLSearchParams(queryString);
   if (path === 'search') return { view: 'search', query: (params.get('q') || '').trim(), id: '' };
   if (path.startsWith('gene/')) return { view: 'gene', id: decodeURIComponent(path.slice(5)), query: '' };
-  if (['topics', 'browse', 'downloads', 'blast', 'sources', 'help'].includes(path)) return { view: path, query: '', id: '' };
+  if (['topics', 'kgm', 'browse', 'bulk', 'score', 'downloads', 'blast', 'sources', 'help'].includes(path)) return { view: path, query: '', id: '' };
   return { view: 'home', query: '', id: '' };
-}
-
-function handleRouteChange() {
-  const route = parseHashRoute();
-  if (route.view === 'home') return renderHome();
-  if (route.view === 'search') return renderSearchRoute(route);
-  if (route.view === 'gene') return void loadGenes().then(() => renderGeneRoute(route));
-  if (route.view === 'topics') return renderStaticRoute('topics');
-  if (route.view === 'browse') return renderStaticRoute('browse');
-  if (route.view === 'downloads') return renderStaticRoute('downloads');
-  if (route.view === 'sources') return renderStaticRoute('sources');
-  if (route.view === 'help') return renderStaticRoute('help');
-}
-
-function renderGeneNotFound(id) {
-  qs('detailTitle').textContent = '未找到基因';
-  qs('detailContent').innerHTML = `
-    <div class="detail-grid">
-      <article class="card full">
-        <h3>未找到基因</h3>
-        <p class="muted">${escapeHtml(id)} 不存在于当前数据集中。</p>
-        <button class="button primary small" id="geneNotFoundBack">返回搜索页</button>
-      </article>
-    </div>
-  `;
-  qs('geneNotFoundBack')?.addEventListener('click', () => goToHash('search'));
 }
 
 function downloadCsv(rows, filename) {
@@ -2264,19 +3100,27 @@ function goToHash(view, value = '') {
 
 async function submitHomeSearch() {
   const value = String(qs('homeSearchInput')?.value || '').trim();
+  syncSpeciesFilters('homeSpeciesFilter');
   if (!value) {
     setSearch('');
     return;
   }
   try {
     await loadGenes();
-    const exact = state.geneById.get(value) || state.genes.find(gene => normalize(gene.gene_id).toLowerCase() === value.toLowerCase());
-    if (exact) {
+    const scoped = extractSpeciesScopedQuery(value);
+    if (scoped.speciesFilter) setSpeciesFilterValue(scoped.speciesFilter);
+    const queryValue = scoped.query;
+    const speciesFilter = qs('speciesFilter')?.value || '';
+    const exact = state.geneById.get(queryValue) || state.genes.find(gene => normalize(gene.gene_id).toLowerCase() === queryValue.toLowerCase());
+    if (exact && (!speciesFilter || normalize(exact.species) === speciesFilter)) {
       goToHash('gene', exact.gene_id);
       return;
     }
-    const groups = buildQueryGroups(value);
-    const matches = state.genes.filter(gene => matchesGroups(getFieldText(gene, 'all'), groups));
+    const groups = buildQueryGroups(queryValue);
+    const matches = state.genes.filter(gene => {
+      if (speciesFilter && normalize(gene.species) !== speciesFilter) return false;
+      return matchesGroups(getFieldText(gene, 'all'), groups);
+    });
     if (matches.length === 1) {
       goToHash('gene', matches[0].gene_id);
       return;
@@ -2293,18 +3137,22 @@ function setSearch(query, options = {}) {
     state.submittedQuery = '';
     state.currentPage = 1;
     syncSearchInputs('');
+    setSpeciesFilterValue('');
     renderSearchPrompt(true);
     qs('resultsPanel').hidden = true;
     renderSearchStatus({});
     goToHash('search');
     return;
   }
-  state.submittedQuery = value;
-  syncSearchInputs(value);
+  const scoped = extractSpeciesScopedQuery(value);
+  if (scoped.speciesFilter) setSpeciesFilterValue(scoped.speciesFilter);
+  const searchValue = scoped.query || value;
+  state.submittedQuery = searchValue;
+  syncSearchInputs(searchValue);
   state.activeTopicId = '';
   state.currentPage = 1;
-  if (!options.skipHash) window.location.hash = buildHash('search', value);
-  else void runSearch(value, options);
+  if (!options.skipHash) window.location.hash = buildHash('search', searchValue);
+  else void runSearch(searchValue, options);
 }
 
 function searchByTopic(topicId) {
@@ -2321,9 +3169,10 @@ function syncSearchStateFromInputs() {
 function bindEvents() {
   qs('homeSearchButton')?.addEventListener('click', () => { void submitHomeSearch(); });
   qs('homeSearchInput')?.addEventListener('keydown', (e) => { if (e.key === 'Enter') void submitHomeSearch(); });
+  qs('homeSpeciesFilter')?.addEventListener('change', () => syncSpeciesFilters('homeSpeciesFilter'));
   qs('searchButton')?.addEventListener('click', () => setSearch(qs('searchInput')?.value || ''));
   qs('searchInput')?.addEventListener('keydown', (e) => { if (e.key === 'Enter') setSearch(qs('searchInput')?.value || ''); });
-  qs('speciesFilter')?.addEventListener('change', () => applyFilters(true, { skipUrl: true }));
+  qs('speciesFilter')?.addEventListener('change', () => { syncSpeciesFilters('speciesFilter'); applyFilters(true, { skipUrl: true }); });
   qs('fieldFilter')?.addEventListener('change', () => applyFilters(true, { skipUrl: true }));
   qs('annotationFilter')?.addEventListener('change', () => applyFilters(true, { skipUrl: true }));
   qs('sortMode')?.addEventListener('change', () => applyFilters(true, { skipUrl: true }));
@@ -2333,7 +3182,7 @@ function bindEvents() {
     state.activeTopicId = '';
     state.currentPage = 1;
     syncSearchInputs('');
-    qs('speciesFilter').value = '';
+    setSpeciesFilterValue('');
     qs('fieldFilter').value = 'all';
     qs('annotationFilter').value = '';
     qs('sortMode').value = 'relevance';
@@ -2355,16 +3204,16 @@ function bindEvents() {
     if (searchEl) { setSearch(searchEl.getAttribute('data-search') || ''); return; }
 
     const homeSearchEl = target.closest('[data-home-search]');
-    if (homeSearchEl) { setSearch(homeSearchEl.getAttribute('data-home-search') || ''); return; }
+    if (homeSearchEl) { syncSpeciesFilters('homeSpeciesFilter'); setSearch(homeSearchEl.getAttribute('data-home-search') || ''); return; }
 
     const topicEl = target.closest('[data-topic-search]');
     if (topicEl) { searchByTopic(topicEl.getAttribute('data-topic-search') || ''); return; }
 
-    const viewEl = target.closest('[data-view]');
+    const viewEl = target.closest('a[data-view],button[data-view]');
     if (viewEl) {
       const id = viewEl.getAttribute('data-view') || '';
       if (state.geneById.has(id)) { goToHash('gene', id); return; }
-      if (['home', 'search', 'topics', 'browse', 'downloads', 'blast', 'sources', 'help'].includes(id)) { goToHash(id); return; }
+      if (['home', 'search', 'score', 'topics', 'kgm', 'browse', 'bulk', 'downloads', 'blast', 'sources', 'help'].includes(id)) { goToHash(id); return; }
     }
 
     const copyGeneEl = target.closest('[data-action="copy-gene-id"]');
@@ -2402,6 +3251,70 @@ function bindEvents() {
       return;
     }
 
+    const blastDownload = target.closest('[data-action="download-blast-tsv"]');
+    if (blastDownload) {
+      downloadBlastTsv();
+      return;
+    }
+
+    if (target.closest('#bulkLookup')) {
+      void runBulkLookup();
+      return;
+    }
+
+    if (target.closest('#bulkExample')) {
+      const input = qs('bulkGeneIds');
+      if (input) input.value = 'evm.model.CTG_28.2_Akon\nevm.model.HIC_ASM_6.713_Akon\nevm.model.HIC_ASM_3.9213_Akon';
+      void runBulkLookup();
+      return;
+    }
+
+    if (target.closest('#bulkDownloadCsv')) {
+      downloadBulkCsv();
+      return;
+    }
+
+    if (target.closest('#bulkDownloadCds')) {
+      void downloadBulkFasta('cds');
+      return;
+    }
+
+    if (target.closest('#bulkDownloadProtein')) {
+      void downloadBulkFasta('protein');
+      return;
+    }
+
+    if (target.closest('#scoreRun')) {
+      void runScoreAnalysis();
+      return;
+    }
+
+    if (target.closest('#scoreExampleGene')) {
+      const input = qs('scoreQuery');
+      if (input) input.value = 'evm.model.HIC_ASM_10.860_Akon';
+      qs('scoreModeSelect').value = 'gene';
+      void runScoreAnalysis();
+      return;
+    }
+
+    if (target.closest('#scoreExampleFunction')) {
+      const input = qs('scoreQuery');
+      if (input) input.value = 'glucomannan biosynthesis';
+      qs('scoreModeSelect').value = 'function';
+      void runScoreAnalysis();
+      return;
+    }
+
+    if (target.closest('#scoreDownloadCsv')) {
+      downloadScoreCsv();
+      return;
+    }
+
+    if (target.closest('#kgmDownloadCsv')) {
+      downloadKgmCsv();
+      return;
+    }
+
     const seqClose = target.closest('[data-action="close-sequence"]');
     if (seqClose) {
       clearSequenceViewer();
@@ -2426,6 +3339,8 @@ function applyFilters(resetPage = false, options = {}) {
 function renderStaticSections() {
   renderTopicCards();
   renderBrowsePanels();
+  renderBulkContent();
+  renderScoreContent();
   renderDownloadCards();
   renderBlastContent();
   renderSourceContent();
@@ -2466,7 +3381,7 @@ function restoreSearchState(saved) {
   }
   if (saved.hash) state.lastSearchHash = saved.hash;
   if (saved.fieldFilter !== undefined) qs('fieldFilter').value = saved.fieldFilter || 'all';
-  if (saved.speciesFilter !== undefined) qs('speciesFilter').value = saved.speciesFilter || '';
+  if (saved.speciesFilter !== undefined) setSpeciesFilterValue(saved.speciesFilter || '');
   if (saved.annotationFilter !== undefined) qs('annotationFilter').value = saved.annotationFilter || '';
   if (saved.sortMode !== undefined) qs('sortMode').value = saved.sortMode || 'relevance';
   if (saved.pageSize !== undefined) qs('pageSize').value = String(saved.pageSize || '100');
@@ -2479,12 +3394,18 @@ function handleRouteChange() {
   if (route.view === 'home') { renderHome(); return; }
   if (route.view === 'search') { renderSearchRoute(route); return; }
   if (route.view === 'gene') { void loadGenes().then(() => renderGeneRoute(route)); return; }
+  if (route.view === 'kgm') {
+    renderStaticRoute('kgm');
+    renderKgmTopicContent();
+    return;
+  }
   renderStaticRoute(route.view);
 }
 
 function updateSummarySections() {
   renderTopicCards();
   renderBrowsePanels();
+  renderScoreContent();
   renderDownloadCards();
   renderBlastContent();
   renderSourceContent();
@@ -2493,6 +3414,7 @@ function updateSummarySections() {
 
 async function init() {
   renderQuickSearches();
+  populateSpeciesFilters();
   renderHomeModules();
   bindEvents();
   try {
