@@ -2,66 +2,76 @@
 
 This project is a static frontend plus a Supabase BLAST queue.
 
-## Frontend on Vercel
+## Recommended mainland deployment
 
-1. Push this repository to GitHub.
-2. In Vercel, import the GitHub repository.
-3. Use these project settings:
-   - Framework Preset: Other
-   - Build Command: empty
-   - Output Directory: `.`
-   - Install Command: empty
-4. Deploy the project.
-5. Open the deployed URL and test:
-   - `#/`
-   - `#search?q=csl`
-   - `#blast`
-   - `data/processed/jbrowse-app/index.html`
+Use Tencent EdgeOne Pages for the frontend shell and Tencent COS for large
+public data.
 
-The site uses hash routes, so no SPA rewrite is required.
+Detailed instructions:
 
-## Large file boundary
+```text
+docs/deployment/edgeone-cos.md
+```
 
-Use Vercel for the static website shell and ordinary JSON/FASTA assets. Keep these generated or oversized files out of Git and out of the Vercel deployment unless you intentionally move them to object storage:
+Summary:
 
-- `blastdb/konjac_genome.*`
-- `data/processed/jbrowse/assemblies/*.fna*`
-- `data/processed/jbrowse-app/assemblies/*.fna*`
-- `data/raw/`
+1. Run `node scripts/build-edgeone-cos-manifest.mjs`.
+2. Upload every object from `deploy/cos-upload-manifest.json` to COS.
+3. Configure COS CORS with `GET`, `HEAD`, and `Range` support.
+4. In EdgeOne Pages, connect the GitHub repository.
+5. Set build command to `node scripts/build-edgeone-pages-package.mjs`.
+6. Set output directory to `edgeone-dist`.
+7. Set public environment variable `KONJAC_COS_ORIGIN=https://YOUR-COS-DOMAIN`.
 
-The genome BLAST database belongs on the machine that runs `scripts/run-supabase-blast-worker.ps1`. The browser only submits jobs and reads results from Supabase. If the public JBrowse genome files become too large for the frontend host, place the assembly BGZF/FAI/GZI files in Supabase Storage or Cloudflare R2 and update `data/processed/jbrowse-app/config.json` to point at those public URLs.
+The generated `edgeone-dist/` package is only about 5.7 MB. Large files such
+as `data/genes.json`, CDS FASTA, and the JBrowse reference assembly stay on
+COS.
+
+## Overseas mirror on Vercel
+
+Keep the current Vercel deployment as an overseas mirror and rollback target:
+
+```text
+https://konjac-gene-explorer.vercel.app
+```
+
+If you redeploy Vercel from the full repository, use the same small-package
+idea or keep the existing `.vercelignore` rules. Vercel is not the preferred
+mainland entry because it may require VPN access.
 
 ## Supabase setup
 
-1. Open Supabase Auth settings and enable Email/Password.
-2. Add the Vercel production URL to the Auth URL settings.
-3. The current Supabase project has already been migrated through the Supabase MCP. For a fresh Supabase project, run these SQL files in order from the Supabase SQL editor:
-   - `supabase/migrations/20260503190000_create_blast_queue.sql`
-   - `supabase/migrations/20260504102000_set_blast_updated_at_search_path.sql`
-   - `supabase/migrations/20260504112000_add_genome_blast_database.sql`
-   - `supabase/migrations/20260504112100_allow_genome_blast_jobs.sql`
+Supabase provides authentication and the BLAST task queue. It does not host the
+large static genome data in the EdgeOne/COS deployment.
 
-Do not run `supabase db push` against the already migrated project unless you first align the Supabase CLI migration history, because the MCP-generated remote migration versions differ from the local filenames.
-
+1. Open Supabase Auth settings and enable Email/Password if login is needed.
+2. Add the production frontend URL to the Auth URL settings.
+3. For a fresh Supabase project, run the SQL migrations from `supabase/migrations/`.
 4. Deploy the Edge Function:
 
 ```powershell
 supabase functions deploy blast
 ```
 
-The `blast` function requires a logged-in user for submit requests. Status requests use the saved `job_id` and public task token.
+The `blast` function requires a logged-in user for submit requests. Status
+requests use the saved `job_id` and public task token.
 
 ## Local BLAST worker
 
-The worker runs on your Windows computer. Keep the service role key only in your local environment.
-Use either the new `sb_secret_...` Secret API Key or the legacy `service_role` JWT. Do not use the publishable key for the worker. The worker sets a non-browser User-Agent so Supabase accepts `sb_secret_...` from this local background process.
+The worker runs on your Windows computer. Keep the service role key only in
+your local environment.
 
-Build the local databases first. CDS and protein are small enough to keep in the repository; genome BLAST is generated locally and ignored by Git.
+Use either the new `sb_secret_...` Secret API Key or the legacy `service_role`
+JWT. Do not use the publishable key for the worker.
+
+Build the local databases first:
 
 ```powershell
 Set-Location "<project-root>"
 .\scripts\build-blast-db.ps1 -IncludeGenome
 ```
+
+Start the worker:
 
 ```powershell
 Set-Location "<project-root>"
@@ -70,7 +80,9 @@ $env:SUPABASE_SERVICE_ROLE_KEY="paste-service-role-key-here"
 .\scripts\run-supabase-blast-worker.ps1
 ```
 
-When the worker is offline, submitted BLAST jobs stay in `queued`. When it is running, it claims queued jobs, executes local BLAST+, and writes hits back to Supabase.
+When the worker is offline, submitted BLAST jobs stay in `queued`. When it is
+running, it claims queued jobs, executes local BLAST+, and writes hits back to
+Supabase.
 
 ## Local regression checks
 
@@ -79,4 +91,5 @@ Set-Location "<project-root>"
 npx http-server . -p 8002 -c-1 --cors
 ```
 
-Open `http://127.0.0.1:8002/#/` and verify search, gene detail, CDS/protein, overlay, JBrowse, and BLAST.
+Open `http://127.0.0.1:8002/#/` and verify search, gene detail, CDS/protein,
+overlay, JBrowse, scoring, and BLAST.

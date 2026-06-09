@@ -1,0 +1,5 @@
+{
+  "buildCommand": "node scripts/build-edgeone-pages-package.mjs",
+  "outputDirectory": "edgeone-dist",
+  "nodeVersion": "22.11.0"
+}

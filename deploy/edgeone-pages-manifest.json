@@ -1,0 +1,64 @@
+{
+  "generatedAt": "2026-06-09T03:20:33.282Z",
+  "target": "Tencent EdgeOne Pages",
+  "limitBytes": 26214400,
+  "fileCount": 11,
+  "totalBytes": 5698466,
+  "files": [
+    {
+      "path": "index.html",
+      "size": 16479,
+      "sha256": "1e82012353e3aa706faf9618902702d382a7e12c6c9c07eb53d1a66577194613"
+    },
+    {
+      "path": "app.js",
+      "size": 146237,
+      "sha256": "8ee150409c56f03cb3b25efc242a2678a5ab28af0529bf83b86f6d3d8036eb5f"
+    },
+    {
+      "path": "styles.css",
+      "size": 29337,
+      "sha256": "66048e4e19c7bd15e23aae4fe0e9aa662274acb5b6e17a785a821a033dc81020"
+    },
+    {
+      "path": "search-worker.js",
+      "size": 8353,
+      "sha256": "ce8e4ebf83569ea97f2cfcfa882fe3b2331f50f01c299f8e1b26fdbf44ffdcbb"
+    },
+    {
+      "path": "runtime-config.js",
+      "size": 132,
+      "sha256": "7f5e819301035292bc155401fbd04a5799f2c8d2681a583a16880930bcca3a3c"
+    },
+    {
+      "path": "assets/ai/annotation-card.png",
+      "size": 1722274,
+      "sha256": "78069a436caf5ffa8361e4ccf38cbc7db4bb0c1b936643bf6f3ca8f5950e0577"
+    },
+    {
+      "path": "assets/ai/genome-browser-card.png",
+      "size": 1428989,
+      "sha256": "205de0506b1231c9a4696e5402c5a9dc6b6f94faff642cb7829b32ad3bc19acb"
+    },
+    {
+      "path": "assets/ai/konjac-hero-genome.png",
+      "size": 2336793,
+      "sha256": "7b160ad71c24ed922497b9476339286e87ab47ed1671bf8baf48795417861d04"
+    },
+    {
+      "path": "scripts/gene-display-core.js",
+      "size": 988,
+      "sha256": "2dff6f627741fe12eca33ac917487164660657cbd4b051a169e9ff6fcadf2f73"
+    },
+    {
+      "path": "scripts/function-scorer-core.js",
+      "size": 8004,
+      "sha256": "462addc934ac6d65dea0143dd658a944aa0ad5345dcea733d34407c289543ad9"
+    },
+    {
+      "path": "scripts/runtime-url-core.js",
+      "size": 880,
+      "sha256": "c6fd49b2878ae5223fcecdf0e307ccad16196cb2d07c561808b85753cf862325"
+    }
+  ]
+}

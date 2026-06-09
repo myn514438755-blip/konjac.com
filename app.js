@@ -1,7 +1,17 @@
-﻿const DATA_URL = './data/genes.json';
-const SUMMARY_URL = './data/build_summary.json';
-const OVERLAY_INDEX_URL = './data/processed/annotations/overlay/annotation_overlay_index.json';
-const JBROWSE_SEQID_MAP_URL = './data/processed/jbrowse/seqid_map.json';
+﻿const runtimeUrls = window.KonjacRuntimeUrls.createResolvers(
+  window.KONJAC_RUNTIME_CONFIG || {}
+);
+const DATA_URL = runtimeUrls.dataUrl('genes.json');
+const SUMMARY_URL = runtimeUrls.dataUrl('build_summary.json');
+const OVERLAY_INDEX_URL = runtimeUrls.dataUrl(
+  'processed/annotations/overlay/annotation_overlay_index.json'
+);
+const JBROWSE_SEQID_MAP_URL = runtimeUrls.dataUrl(
+  'processed/jbrowse/seqid_map.json'
+);
+const SEQUENCE_INDEX_URL = runtimeUrls.dataUrl(
+  'processed/sequences/sequence_index.json'
+);
 const SEARCH_STATE_KEY = 'konjac_gene_search_state_v1';
 const DATA_BYTES_HINT = 63035084;
 const SUPABASE_URL = 'https://plvylqvdlavriupvphxj.supabase.co';
@@ -12,8 +22,8 @@ const SUPABASE_AUTH_STORAGE_KEY = 'konjac_supabase_auth_v1';
 
 const VIEW_IDS = ['homeView', 'searchView', 'scoreView', 'geneView', 'topicsView', 'kgmView', 'browseView', 'bulkView', 'downloadsView', 'blastView', 'sourcesView', 'helpView'];
 const SEQUENCE_FILES = {
-  cds: './downloads/Amorphophallus_konjac.clean.cds',
-  protein: './downloads/Amorphophallus_konjac.clean.pep'
+  cds: runtimeUrls.downloadUrl('Amorphophallus_konjac.clean.cds'),
+  protein: runtimeUrls.downloadUrl('Amorphophallus_konjac.clean.pep')
 };
 
 const TOPICS = [
@@ -733,7 +743,7 @@ function renderHomeModules() {
     { title: 'KGM 专题', href: '#kgm', desc: '查看葡甘聚糖、细胞壁和糖基转移相关候选基因。' },
     { title: '注释分类浏览', href: '#browse', desc: '按 GO、InterPro、Pfam 和同源物种快速浏览。' },
     { title: '批量工具', href: '#bulk', desc: '批量查询 Gene ID，导出注释表，并下载 CDS 或蛋白序列。' },
-    { title: '基因组浏览器', href: './data/processed/jbrowse-app/index.html', desc: '查看基因组坐标、基因结构和 GFF 注释轨道。' },
+    { title: '基因组浏览器', href: runtimeUrls.jbrowseUrl('index.html'), desc: '查看基因组坐标、基因结构和 GFF 注释轨道。' },
     { title: 'BLAST 序列比对', href: '#blast', desc: '提交核酸或蛋白序列，查看与花魔芋 CDS、蛋白和基因组数据库的相似性结果。' },
     { title: '数据下载', href: '#downloads', desc: '下载整合表、GFF、CDS、protein FASTA 和 ZEN 文件。' },
     { title: '数据来源与引用', href: '#sources', desc: '查看数据来源、引用格式、许可说明和维护信息。' },
@@ -944,8 +954,18 @@ function renderDownloadCards() {
   const version = state.summary.version || 'v1.2.1';
   const updated = state.summary.website_last_updated || '2026-04-29';
   const files = [
-    ...(state.summary.downloads || []).map(item => ({ name: item.name, path: './' + item.path, bytes: item.bytes, available: true })),
-    { name: 'species_catalog.json', path: './data/processed/species_catalog.json', bytes: null, available: true }
+    ...(state.summary.downloads || []).map(item => ({
+      name: item.name,
+      path: resolvePublicAssetPath(item.path),
+      bytes: item.bytes,
+      available: true
+    })),
+    {
+      name: 'species_catalog.json',
+      path: runtimeUrls.dataUrl('processed/species_catalog.json'),
+      bytes: null,
+      available: true
+    }
   ];
   qs('downloadCards').innerHTML = files.map(file => {
     const meta = DOWNLOAD_META[file.name] || { label: file.name, description: '下载文件' };
@@ -2108,7 +2128,10 @@ function renderBlastSubjectLink(hit, database = '') {
       const from = Math.max(1, Math.min(start, end) - 2000);
       const to = Math.max(start, end) + 2000;
       const loc = `${id}:${from}..${to}`;
-      return `<a class="gene-link blast-subject-link" href="./data/processed/jbrowse-app/index.html?config=./config.json&loc=${encodeURIComponent(loc)}" target="_blank" rel="noopener">${escapeHtml(id)}:${formatNumber(Math.min(start, end))}-${formatNumber(Math.max(start, end))}</a>`;
+      const href = runtimeUrls.jbrowseUrl(
+        `index.html?config=./config.json&loc=${encodeURIComponent(loc)}`
+      );
+      return `<a class="gene-link blast-subject-link" href="${escapeHtml(href)}" target="_blank" rel="noopener">${escapeHtml(id)}:${formatNumber(Math.min(start, end))}-${formatNumber(Math.max(start, end))}</a>`;
     }
   }
   return `<a class="gene-link blast-subject-link" href="#gene/${encodeURIComponent(id)}">${escapeHtml(id)}</a>`;
@@ -2250,11 +2273,30 @@ function normalizeJbrowseSeqidMapPath(file) {
   return `data/processed/jbrowse/${value}`;
 }
 
+function stripDataPrefix(file) {
+  return String(file || '')
+    .replace(/\\/g, '/')
+    .replace(/^\.?\//, '')
+    .replace(/^data\//, '');
+}
+
+function resolvePublicAssetPath(file) {
+  const value = String(file || '').replace(/\\/g, '/').replace(/^\.?\//, '');
+  if (!value) return '';
+  if (value.startsWith('downloads/')) {
+    return runtimeUrls.downloadUrl(value.slice('downloads/'.length));
+  }
+  if (value.startsWith('data/')) {
+    return runtimeUrls.dataUrl(value.slice('data/'.length));
+  }
+  return runtimeUrls.downloadUrl(value);
+}
+
 async function loadSequenceIndex() {
   if (state.sequenceIndex) return state.sequenceIndex;
   if (state.sequenceIndexPromise) return state.sequenceIndexPromise;
   state.sequenceIndexPromise = (async () => {
-    const res = await fetch('./data/processed/sequences/sequence_index.json');
+    const res = await fetch(SEQUENCE_INDEX_URL);
     if (!res.ok) {
       const error = new Error('序列索引未找到');
       error.code = 'SEQUENCE_INDEX_NOT_FOUND';
@@ -2276,7 +2318,7 @@ async function loadSequenceChunk(filePath, label) {
   if (state.sequenceChunkPromise.has(normalized)) return state.sequenceChunkPromise.get(normalized);
 
   const promise = (async () => {
-    const res = await fetch(`./${normalized}`);
+    const res = await fetch(runtimeUrls.dataUrl(stripDataPrefix(normalized)));
     if (!res.ok) {
       const error = new Error('序列分片文件未找到');
       error.code = 'SEQUENCE_CHUNK_NOT_FOUND';
@@ -2321,7 +2363,7 @@ async function loadOverlayChunk(filePath) {
   if (state.overlayChunkPromise.has(normalized)) return state.overlayChunkPromise.get(normalized);
 
   const promise = (async () => {
-    const res = await fetch(`./${normalized}`);
+    const res = await fetch(runtimeUrls.dataUrl(stripDataPrefix(normalized)));
     if (!res.ok) {
       const error = new Error('增强注释暂不可用');
       error.code = 'OVERLAY_CHUNK_NOT_FOUND';
@@ -2377,7 +2419,9 @@ function resolveGenomeBrowserLocation(gene, map) {
     targetSeqid,
     from,
     to,
-    href: `./data/processed/jbrowse-app/index.html?config=./config.json&assembly=${encodeURIComponent('GCA_022559845.1_ASM2255984v1')}&loc=${encodeURIComponent(`${targetSeqid}:${from}..${to}`)}&tracks=Amorphophallus_konjac.clean.gff3&tracklist=false`
+    href: runtimeUrls.jbrowseUrl(
+      `index.html?config=./config.json&assembly=${encodeURIComponent('GCA_022559845.1_ASM2255984v1')}&loc=${encodeURIComponent(`${targetSeqid}:${from}..${to}`)}&tracks=Amorphophallus_konjac.clean.gff3&tracklist=false`
+    )
   };
 }
 
@@ -2650,12 +2694,15 @@ function renderGeneNotFound(id) {
 }
 
 function downloadLinks() {
+  const cdsUrl = runtimeUrls.downloadUrl('Amorphophallus_konjac.clean.cds');
+  const proteinUrl = runtimeUrls.downloadUrl('Amorphophallus_konjac.clean.pep');
+  const gffUrl = runtimeUrls.downloadUrl('Amorphophallus_konjac.clean.gff');
   return `
     <p class="muted">下方提供序列文件与注释下载。</p>
     <p class="download-inline">
-      <a href="./downloads/Amorphophallus_konjac.clean.cds" download>下载 CDS</a>
-      <a href="./downloads/Amorphophallus_konjac.clean.pep" download>下载 protein</a>
-      <a href="./downloads/Amorphophallus_konjac.clean.gff" download>下载 GFF</a>
+      <a href="${escapeHtml(cdsUrl)}" download>下载 CDS</a>
+      <a href="${escapeHtml(proteinUrl)}" download>下载 protein</a>
+      <a href="${escapeHtml(gffUrl)}" download>下载 GFF</a>
     </p>
   `;
 }
@@ -3413,6 +3460,8 @@ function updateSummarySections() {
 }
 
 async function init() {
+  const navJbrowseLink = qs('navJbrowseLink');
+  if (navJbrowseLink) navJbrowseLink.href = runtimeUrls.jbrowseUrl('index.html');
   renderQuickSearches();
   populateSpeciesFilters();
   renderHomeModules();

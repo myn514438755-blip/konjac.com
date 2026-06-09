@@ -35,3 +35,9 @@ Thumbs.db
 
 # Local deployment staging package
 /vercel-deploy-package/
+
+# Tencent EdgeOne local build output and upload logs
+/edgeone-dist/
+.env.cos
+deploy/*.log
+runtime-config.edgeone.local.js
